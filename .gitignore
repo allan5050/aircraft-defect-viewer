@@ -102,6 +102,7 @@ jspm_packages/
 
 # Database files (keep structure, ignore data)
 *.db
+!defects.db
 *.sqlite
 *.sqlite3
 

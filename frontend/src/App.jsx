@@ -131,6 +131,16 @@ function App() {
             onFilterChange={handleFilterChange}
           />
 
+          {/* Table Title and Subtitle */}
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="h5" component="h2" gutterBottom>
+              Aircraft Defect Records
+            </Typography>
+            <Typography variant="subtitle1" color="text.secondary">
+              This table shows all reported defects for the selected aircraft and severity. Use the filters above to narrow down the results.
+            </Typography>
+          </Box>
+
           {/* Table Controls and Record Count */}
           <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>

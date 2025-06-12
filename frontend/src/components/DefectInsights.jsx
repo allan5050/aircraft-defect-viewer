@@ -116,10 +116,10 @@ function DefectInsights({ defects }) {
 
   return (
     <Box sx={{ mb: 4 }}>
-      <Typography variant="h5" gutterBottom sx={{ mb: 3 }}>
-        Manual Code Insights (Python)
-      </Typography>
       <Card>
+        <Typography variant="h6" gutterBottom sx={{ mb: 0, px: 2, pt: 2 }}>
+          Manual Code Insights (Python)
+        </Typography>
         <CardContent>
           {loading && (
             <Box display="flex" flexDirection="column" alignItems="center" py={4}>

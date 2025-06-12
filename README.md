@@ -1,148 +1,117 @@
-# Aviadex: Scalable Aircraft Defect Viewer
+# What you built and why
 
-An advanced, scalable dashboard for viewing and analyzing aircraft maintenance defects, built with a modern hybrid architecture.
+At the top of the application homepage, I built an analytics dashboard that gives users a quick overview of the most important issues in the large dataset. These metrics help users focus on key problems first. Below the data visualizations, I added a 'Manual Code Insights (Python)' section, which is the handwritten analytics part of the program. This provides a quick pulse on operational performance based on the current view, helping enterprise teams better understand their data.
 
----
+The 'Aircraft Defect Records' table fulfills the requirement to show all reported defects for the selected aircraft and severity. The table supports filtering, and users can search for aircraft across very large datasets without slowdowns, thanks to performance optimizations in the search field.
 
-## 🏗️ Architecture Overview
+To handle large datasets (over 100,000 records), the table includes a virtual scrolling feature that loads more records as the user scrolls, preventing performance issues from loading too much data at once. Pagination is the default mode if virtual scrolling is not enabled.
 
-This project uses a hybrid architecture that leverages the strengths of a low-code backend for data management and a custom microservice for specialized analytics.
+Rows in the table can be expanded to show full defect details. This approach allows busy users to expand multiple rows at once, providing more context than a modal-based approach.
 
--   **Frontend**: A responsive **React (Vite)** dashboard built with **Material-UI**. It handles dynamic filtering, pagination, and data visualization. It communicates with two different backend services.
--   **Low-Code Backend (Database)**: **Supabase** (PostgreSQL) serves as the primary database. It handles the core CRUD operations for defect records and offers a scalable, secure, and auto-generated API. All primary defect data is fetched directly from Supabase.
--   **Microservice Backend (Analytics)**: A lightweight **FastAPI (Python)** server that runs two specific, computationally-intensive tasks:
-    1.  A cached endpoint for general analytics (`/api/analytics`).
-    2.  An endpoint that runs manual Python code (`/api/insights`) to generate deeper insights like Mean Time Between Failures (MTBF).
-
-This separation of concerns allows the application to scale efficiently. The resource-intensive data hosting is offloaded to a managed service (Supabase), while the custom business logic remains in a lean, easy-to-maintain Python service.
-
-## 🛠️ Tooling & Stack
-
-This project was built to demonstrate a modern development workflow, balancing manual coding, AI assistance, and low-code platforms.
-
-### 🤖 AI Tools Used
-
--   **AI-Assisted Development (Cursor)**: An AI-powered code editor was used to:
-    -   Generate boilerplate code for React components and FastAPI endpoints.
-    -   Refactor code, such as converting API-fetching logic to use the Supabase client.
-    -   Identify and fix bugs, like adding missing component imports.
-    -   Write and structure documentation and setup scripts.
-
-### 🔧 Low-Code Components
-
--   **Supabase**: Chosen as the low-code backend for its simplicity and power.
-    -   **Database**: A managed PostgreSQL database for storing defect records.
-    -   **API Layer**: Provides an instant, secure, and scalable API for data access without writing backend code for basic data operations.
-    -   **Scalability**: Offloads the complexity of database management, allowing developers to focus on application features.
-
-### ✍️ Handwritten Code
-
--   **Frontend Components (React/JSX)**: All UI components (`DefectTable`, `DefectFilters`, `DefectAnalytics`, `DefectInsights`) create a tailored user experience with Material-UI.
--   **Manual Python Analytics (`backend/analytics.py`)**: The `DefectAnalyzer` class was written manually in Python to implement specific business logic (e.g., MTBF calculation) that is not easily achievable with standard database queries. This represents the custom, high-value logic of the application.
-
-## 📊 Scalability Approach
-
-The architecture was designed with scalability as a primary concern.
-
-### Current Implementation (Handles 10k+ records)
-
--   **Frontend Performance Optimizations**:
-    -   **TanStack Query**: Implements intelligent caching, background refetching, and optimistic updates. Reduces redundant API calls by 80%.
-    -   **Smart Pagination**: The UI uses API-based pagination, fetching only 50 records at a time. This keeps the DOM light and initial load times fast, regardless of the total dataset size.
-    -   **Virtual Scrolling**: ✅ **IMPLEMENTED** - React Window integration provides 60 FPS scrolling with 100k+ records. Toggle between pagination and virtual scrolling modes.
-    -   **Debounced Search**: 300ms debounce on aircraft search prevents excessive API calls while typing.
-    -   **Skeleton Loading**: Provides immediate visual feedback while data loads, improving perceived performance.
-    -   **Component Memoization**: React components are optimized to prevent unnecessary re-renders.
-
--   **Backend Performance Optimizations**:
-    -   **Database-Level Analytics**: Analytics calculations happen directly in PostgreSQL/SQLite using aggregate queries instead of fetching all data to the application layer.
-    -   **LRU Caching**: The main analytics endpoint is cached with automatic cache invalidation every 5 minutes.
-    -   **Rate Limiting**: ✅ **IMPLEMENTED** - SlowAPI integration prevents API abuse with endpoint-specific limits (120/min for data, 20/min for analytics).
-    -   **Indexed Queries**: The `setup.sql` script creates indexes on `aircraft_registration`, `severity`, and `reported_at` for high-performance filtering and sorting.
-    -   **Connection Pooling Ready**: FastAPI is configured for connection pooling in production environments.
-    -   **Efficient Filtering**: All filters are applied at the database level via optimized SQL queries.
-
-### Production Roadmap
-
--   **Frontend Rendering**:
-    -   ~~**Virtual Scrolling**: For datasets in the hundreds of thousands, **TanStack Virtual** or **React Window** would be implemented in `DefectTable` to render only the visible rows, ensuring 60 FPS scrolling.~~ ✅ **IMPLEMENTED**
-    -   **Infinite Scrolling**: TanStack Query's infinite queries are already implemented and ready for activation.
-    -   **Web Workers**: For complex client-side calculations, move processing to web workers to prevent UI blocking.
-    -   **Code Splitting**: Implement route-based code splitting to reduce initial bundle size.
-
--   **Backend Architecture**:
-    -   **Read Replicas**: Supabase supports PostgreSQL read replicas to distribute the load for high-traffic scenarios.
-    -   **Data Warehouse**: The FastAPI analytics service could be pointed to a dedicated data warehouse (like BigQuery or a Snowflake replica) to prevent analytical queries from impacting transactional performance.
-    -   **Redis Caching Layer**: Implement Redis for distributed caching across multiple server instances.
-    -   ~~**Rate Limiting**: Add rate limiting middleware to prevent API abuse and ensure fair resource usage.~~ ✅ **IMPLEMENTED**
-    -   **Serverless Deployment**: The FastAPI service can be deployed as a serverless function (e.g., AWS Lambda, Vercel Functions) to scale horizontally on demand.
-
--   **Database Optimizations**:
-    -   **Materialized Views**: Pre-calculate common analytics queries for sub-second response times.
-    -   **Partitioning**: Partition large tables by date or aircraft registration for improved query performance.
-    -   **Connection Pooling**: Implement PgBouncer or similar for efficient database connection management.
-
--   **Multi-User Concurrent Access**:
-    -   **Real-time Updates**: Implement WebSocket connections for live data updates across multiple users.
-    -   **Optimistic Locking**: Prevent data conflicts when multiple users edit the same records.
-    -   **User Session Management**: Implement proper authentication and session handling for concurrent users.
-
-### Performance Benchmarks (Current)
--   **Initial Load**: < 1 second (50 records)
--   **Filter Response**: < 100ms (cached) / < 300ms (database query)
--   **Analytics Load**: < 200ms (cached) / < 500ms (database aggregation)
--   **Search Autocomplete**: < 150ms with 300ms debounce
--   **Page Navigation**: < 100ms (TanStack Query cache hits)
+If the Supabase database is unavailable, the application falls back to using SQLite to show mock data. This ensures users can still interact with the system and see basic data, even if a backend service is down.
 
 ---
 
-## 🚦 Setup and Run Instructions
+# Stack used and why
 
-Follow these steps to get the project running locally.
+- **Frontend:** React (Vite) with Material-UI for a modern, responsive dashboard. React is widely adopted, fast, and has a rich ecosystem for building scalable UIs.
+- **Backend:** Python (FastAPI) for analytics and fallback data serving. Python is my most proficient language for prototyping and is well-suited for rapid development and integration with AI tools.
+- **Low-Code Backend:** Supabase (managed PostgreSQL) for instant, scalable, and secure data storage and API access. Supabase is fast to set up and requires minimal code for CRUD operations.
+- **Fallback:** SQLite is used for local analytics and as a backup data source if Supabase is unavailable.
+- **Other:** Node.js for data seeding scripts.
 
-### 1. Supabase Setup (Low-Code Backend)
+Python was chosen for its speed of development and strong documentation, which also makes it highly compatible with LLM-based development. Supabase was selected as a low-code/no-code PostgreSQL database because it can be set up in minutes with minimal configuration, making it ideal for rapid prototyping.
 
-1.  **Create a Project**: Go to [Supabase](https://supabase.com/) and create a new project.
-2.  **Create Tables and Views**:
+---
+
+# How you used AI/LLMs
+
+I used the Anthropic Claude Opus model to generate an initial architecture, folder structure, and code outline based on the requirements. I then moved this skeleton into Cursor IDE, where I used the built-in AI agent to help with setup, debugging, and incremental feature development.
+
+Speech-to-text was used to interact with the LLM more efficiently, allowing me to provide detailed input quickly. The audio is transcribed by Microsoft Azure's speech-to-text service.
+
+- **AI-Assisted Development (Cursor):** Used for generating boilerplate code, refactoring, bug fixing, and documentation.
+- **AI for Architecture:** Used LLMs to design the initial architecture and folder structure.
+- **AI for SQL:** Used LLMs to generate the initial Supabase setup SQL script.
+
+---
+
+# What was handled via low-code
+
+- **Supabase:** Used as a low-code/no-code backend for data storage and API. Only a simple SQL script (`setup.sql`) was needed to set up the database, with no backend code required for basic CRUD operations.
+- **Supabase Client:** Used for querying and filtering data in the frontend with minimal code.
+
+---
+
+# How the solution could scale in a production system:
+
+## Frontend rendering strategies
+- **Pagination:** Efficiently loads and renders data by default.
+- **Virtual Scrolling:** Uses React Window for smooth performance with 100k+ records, rendering only visible rows. Users can toggle between pagination and virtual scrolling.
+- **Debounced Search:** Prevents excessive API calls by waiting 300ms after typing before searching.
+- **Skeleton Loading:** Provides immediate visual feedback while data loads.
+- **Component Memoization:** Prevents unnecessary re-renders for better performance.
+- **Code Splitting:** (Planned) Route-based code splitting to reduce initial bundle size.
+
+## Backend architecture
+- **Supabase:** Managed PostgreSQL with instant API, scalable for high-traffic scenarios.
+- **FastAPI Microservice:** Handles analytics and custom business logic, with LRU caching and rate limiting (SlowAPI) to prevent abuse.
+- **Read Replicas:** (Planned) Use Supabase read replicas for load distribution.
+- **Serverless Deployment:** (Planned) Deploy FastAPI as a serverless function for horizontal scaling.
+- **Fallback to SQLite:** If Supabase is down, analytics and mock data are served from a local SQLite database.
+
+## Data flow and optimization
+- **Database-Level Filtering:** All filters are applied at the database level for efficiency.
+- **Indexed Queries:** Indexes on key columns for high-performance filtering and sorting.
+- **LRU Caching:** Analytics endpoints are cached with automatic invalidation.
+- **Efficient Data Loading:** Only fetches visible records (pagination/virtualization).
+- **Rate Limiting:** Endpoint-specific limits to ensure fair resource usage.
+- **Materialized Views & Partitioning:** (Planned) For sub-second analytics and large table performance.
+
+---
+
+# Setup and run instructions
+
+## 1. Supabase Setup (Low-Code Backend)
+1.  **Create a Project:** Go to [Supabase](https://supabase.com/) and create a new project.
+2.  **Create Tables and Views:**
     -   Navigate to the **SQL Editor** in the Supabase dashboard.
     -   Click **New query**.
     -   Copy and paste the entire content of `setup.sql` from this repository and click **RUN**. This will create the `defects` table and the `distinct_aircraft` view.
-3.  **Get API Credentials**:
+3.  **Get API Credentials:**
     -   Go to **Project Settings** > **API**.
     -   You will need two values:
         -   The **Project URL**.
         -   The **`public` anon key**.
 
-### 2. Frontend Setup
-
-1.  **Navigate to the frontend folder**:
+## 2. Frontend Setup
+1.  **Navigate to the frontend folder:**
     ```bash
     cd frontend
     ```
-2.  **Create Environment File**:
+2.  **Create Environment File:**
     -   Create a file named `.env` in the `frontend/` directory.
     -   Add your Supabase credentials to it like this:
         ```env
         VITE_SUPABASE_URL=YOUR_SUPABASE_URL
         VITE_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
         ```
-3.  **Install Dependencies**:
+3.  **Install Dependencies:**
     ```bash
     npm install
     ```
-4.  **Run the Development Server**:
+4.  **Run the Development Server:**
     ```bash
     npm run dev
     ```
     The frontend will be available at `http://localhost:5173`.
 
-### 3. Backend Setup (Analytics Service & Data Seeding)
-
+## 3. Backend Setup (Analytics Service & Data Seeding)
 1.  **Navigate to the backend folder** (in a new terminal):
     ```bash
     cd backend
     ```
-2.  **Set up and activate virtual environment**:
+2.  **Set up and activate virtual environment:**
     ```bash
     # Create virtual environment (if not already created)
     python -m venv venv
@@ -153,7 +122,7 @@ Follow these steps to get the project running locally.
     # On macOS/Linux:
     source venv/bin/activate
     ```
-3.  **Create Environment File**:
+3.  **Create Environment File:**
     -   Create a file named `.env` in the `backend/` directory.
     -   Go to your Supabase **Project Settings** > **API** again.
     -   This time, copy the **`service_role` secret key**.
@@ -162,7 +131,7 @@ Follow these steps to get the project running locally.
         SUPABASE_URL=YOUR_SUPABASE_URL
         SUPABASE_SERVICE_KEY=YOUR_SERVICE_ROLE_KEY
         ```
-4.  **Install Dependencies**:
+4.  **Install Dependencies:**
     ```bash
     # Install Python dependencies
     pip install -r requirements.txt
@@ -170,12 +139,12 @@ Follow these steps to get the project running locally.
     # Install Node.js dependencies (for the seeding script)
     npm install
     ```
-5.  **Seed the Database**:
+5.  **Seed the Database:**
     -   Run the seeding script to populate your Supabase table with the sample data. This script will delete any existing data before inserting the new records.
     ```bash
     node seed_supabase.mjs
     ```
-6.  **Run the Analytics Server**:
+6.  **Run the Analytics Server:**
     ```bash
     uvicorn main:app --reload --port 8000
     ```
@@ -183,59 +152,31 @@ Follow these steps to get the project running locally.
 
 You should now have the full application running!
 
-## 🎯 Trade-offs & Future Improvements
+## 📂 Data Model & Sample Dataset
+The core entity in Aviadex is a single **defect report**. Defects are stored in (and exposed from) the `defects` table in Supabase using the following schema:
 
-1.  **Analytics Database**: The FastAPI service currently uses a local SQLite database for the main analytics dashboard. In production, this is a bottleneck. The next step would be to point it to a proper data warehouse or a read replica of the main database.
-2.  **Real-time Updates**: The app currently relies on manual refreshes. Supabase's real-time capabilities could be used to subscribe to database changes and update the UI instantly when new defects are reported.
-3.  **Authentication**: Supabase provides a full authentication suite. The application could be extended to include user roles (e.g., engineers, managers) with different permissions.
-4.  **Export Functionality**: Add CSV/PDF export capabilities for filtered data sets.
-5.  **Advanced Analytics**: Implement predictive maintenance algorithms using machine learning models.
-6.  **Mobile Responsiveness**: Optimize the dashboard for mobile and tablet devices.
+```sql
+CREATE TABLE defects (
+  id                  TEXT PRIMARY KEY,
+  aircraft_registration TEXT      NOT NULL,
+  reported_at           TIMESTAMP NOT NULL,
+  defect_type           TEXT      NOT NULL,
+  description           TEXT      NOT NULL,
+  severity              TEXT      NOT NULL CHECK (severity IN ('Low','Medium','High'))
+);
+```
 
-## 🚀 Performance Improvements Implemented
+• **Sample JSON** – A synthetic dataset matching this schema is available at `data/aircraft_defects.json` (10k+ rows). The smaller `data/SMALL_air_defects.json` (~200 rows) is handy for quick local tests.
+• **Seeding** – The `backend/seed_data.py` script can generate an even larger dataset; `backend/seed_supabase.mjs` uploads either JSON file directly to Supabase.
 
-### Recent Optimizations (Latest Version):
+> The UI displays *aircraft_registration*, *defect_type*, *severity*, and *reported_at* in the table. Clicking the chevron on any row expands a **collapsible details panel** with the full *description* and metadata—fulfilling the row expansion requirement.
 
-1. **TanStack Query Integration**: 
-   - Smart caching reduces API calls by ~80%
-   - Background refetching keeps data fresh
-   - Optimistic updates for better UX
+---
 
-2. **Database-Level Analytics**:
-   - Moved from client-side aggregation to SQL aggregation
-   - Reduced analytics load time from ~2-5s to ~200ms
-   - Eliminated the need to fetch all records for calculations
+# What you'd improve with more time
 
-3. **Enhanced Loading States**:
-   - Skeleton loading for perceived performance
-   - Progressive loading indicators
-   - Better error boundaries
+With more time, I would add more analytics and "hot-button" filtering/searching to speed up the user experience and improve system performance. For example, a common enterprise use case might be to find critical defects for today, so I would create a hot button to filter for today's critical defects. Optimizing these queries would reduce compute and database load, and help users find what they need faster.
 
-4. **Virtual Scrolling Implementation**:
-   - ✅ **NEW**: React Window integration for massive datasets
-   - Supports 100k+ records with 60 FPS scrolling
-   - Dynamic row heights with expand/collapse functionality
-   - Toggle between pagination and virtual scrolling modes
+I would also allow users to create their own dashboards and hot buttons, enabling them to work more efficiently and helping the development team learn which patterns are most useful. By supporting customization, we can better understand user needs and improve the product for everyone.
 
-5. **Rate Limiting Implementation**:
-   - ✅ **NEW**: SlowAPI middleware for API protection
-   - Endpoint-specific limits (120/min data, 20/min analytics, 60/min search)
-   - Prevents API abuse and ensures fair resource usage
-   - Ready for Redis-backed distributed rate limiting
-
-6. **Architecture for Scale**:
-   - Infinite scrolling with TanStack Query
-   - Optimized database indexes
-   - Ready for Redis caching layer
-   - Multi-user concurrent access patterns
-
-### Performance Benchmarks (Current)
--   **Initial Load**: < 1 second (50 records)
--   **Filter Response**: < 100ms (cached) / < 300ms (database query)
--   **Analytics Load**: < 200ms (cached) / < 500ms (database aggregation)
--   **Search Autocomplete**: < 150ms with 300ms debounce
--   **Page Navigation**: < 100ms (TanStack Query cache hits)
--   **Virtual Scrolling**: 60 FPS with 100k+ records
--   **Rate Limiting**: 99.9% request success rate under normal load
-
-These improvements prepare the application to handle enterprise-scale datasets (100k+ records) with minimal additional development effort and robust protection against abuse.
+Finally, I would conduct more performance load-testing for the dashboard and table search features to ensure that even with 10,000,000+ records, the application remains fast and responsive.
