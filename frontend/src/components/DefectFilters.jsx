@@ -1,5 +1,5 @@
 // components/DefectFilters.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   TextField,
@@ -9,27 +9,57 @@ import {
   MenuItem,
   Button,
   Autocomplete,
-  Grid
+  Grid,
+  CircularProgress
 } from '@mui/material';
 import { Search, Clear } from '@mui/icons-material';
-import { fetchAircraftList } from '../api/defectApi';
+import { searchAircraft } from '../api/defectApi';
+
+// Debounce function to limit API calls
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
 
 function DefectFilters({ filters, onFilterChange }) {
-  const [aircraftList, setAircraftList] = useState([]);
+  const [aircraftOptions, setAircraftOptions] = useState([]);
+  const [aircraftSearchLoading, setAircraftSearchLoading] = useState(false);
   const [localFilters, setLocalFilters] = useState(filters);
 
-  // Load aircraft list for autocomplete
-  useEffect(() => {
-    const loadAircraft = async () => {
-      try {
-        const data = await fetchAircraftList();
-        setAircraftList(data.aircraft);
-      } catch (err) {
-        console.error('Error loading aircraft list:', err);
+  // Debounced search for aircraft
+  const debouncedSearchAircraft = useCallback(
+    debounce(async (searchTerm) => {
+      if (searchTerm && searchTerm.length >= 2) {
+        setAircraftSearchLoading(true);
+        try {
+          const data = await searchAircraft(searchTerm);
+          setAircraftOptions(data.aircraft);
+        } catch (err) {
+          console.error('Error searching aircraft:', err);
+          setAircraftOptions([]);
+        } finally {
+          setAircraftSearchLoading(false);
+        }
+      } else {
+        setAircraftOptions([]);
       }
-    };
-    loadAircraft();
-  }, []);
+    }, 300), // 300ms debounce
+    []
+  );
+
+  // If there's already a selected aircraft, make sure it's in the options
+  useEffect(() => {
+    if (localFilters.aircraft_registration && !aircraftOptions.includes(localFilters.aircraft_registration)) {
+      setAircraftOptions(prev => [localFilters.aircraft_registration, ...prev]);
+    }
+  }, [localFilters.aircraft_registration, aircraftOptions]);
 
   const handleFilterChange = (field, value) => {
     setLocalFilters(prev => ({
@@ -58,21 +88,35 @@ function DefectFilters({ filters, onFilterChange }) {
       <Grid container spacing={2} alignItems="center">
         <Grid item xs={12} sm={4}>
           <Autocomplete
-            options={aircraftList}
+            options={aircraftOptions}
             value={localFilters.aircraft_registration || null}
             onChange={(event, newValue) => {
               handleFilterChange('aircraft_registration', newValue || '');
             }}
+            onInputChange={(event, newInputValue) => {
+              // Trigger search when user types
+              debouncedSearchAircraft(newInputValue);
+            }}
             isOptionEqualToValue={(option, value) => option === value}
+            loading={aircraftSearchLoading}
+            loadingText="Searching aircraft..."
+            noOptionsText="Type to search aircraft (min 2 characters)"
             renderInput={(params) => (
               <TextField
                 {...params}
                 label="Aircraft Registration"
                 variant="outlined"
                 size="small"
+                placeholder="Type to search aircraft..."
                 InputProps={{
                   ...params.InputProps,
                   startAdornment: <Search sx={{ mr: 1, color: 'action.active' }} />,
+                  endAdornment: (
+                    <>
+                      {aircraftSearchLoading ? <CircularProgress color="inherit" size={20} /> : null}
+                      {params.InputProps.endAdornment}
+                    </>
+                  ),
                 }}
               />
             )}

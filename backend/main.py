@@ -182,6 +182,24 @@ def get_aircraft():
     
     return {"aircraft": aircraft_list}
 
+@app.get("/api/aircraft/search")
+def search_aircraft(q: str = Query(..., min_length=2)):
+    """Search aircraft registrations by partial match (fallback endpoint)."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    # Use SQL LIKE for partial matching
+    search_pattern = f"%{q}%"
+    cursor.execute(
+        "SELECT DISTINCT aircraft_registration FROM defects WHERE aircraft_registration LIKE ? ORDER BY aircraft_registration LIMIT 50",
+        (search_pattern,)
+    )
+    aircraft_list = [row[0] for row in cursor.fetchall()]
+    
+    conn.close()
+    
+    return {"aircraft": aircraft_list}
+
 @app.get("/api/analytics", response_model=AnalyticsResponse)
 def get_analytics():
     """

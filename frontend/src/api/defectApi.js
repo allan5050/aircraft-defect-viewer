@@ -200,34 +200,46 @@ function calculateAnalytics(defects) {
   };
 }
 
-export async function fetchAircraftList() {
-  // Try Supabase first, fallback to FastAPI
+export async function searchAircraft(searchTerm) {
+  if (!searchTerm || searchTerm.length < 2) {
+    return { aircraft: [] };
+  }
+
+  // Try Supabase first for server-side search
   if (supabase) {
     try {
       const { data, error } = await supabase
-        .from('distinct_aircraft')
+        .from('defects')
         .select('aircraft_registration')
-        .order('aircraft_registration', { ascending: true });
+        .ilike('aircraft_registration', `%${searchTerm}%`)
+        .limit(50); // Limit results for performance
 
       if (!error) {
-        return {
-          aircraft: data.map(item => item.aircraft_registration)
-        };
+        // Get unique aircraft registrations
+        const uniqueAircraft = [...new Set(data.map(item => item.aircraft_registration))];
+        return { aircraft: uniqueAircraft.sort() };
       }
-      console.warn("Supabase error, falling back to FastAPI:", error);
+      console.warn("Supabase search error, falling back to FastAPI:", error);
     } catch (supabaseError) {
-      console.warn("Supabase failed, falling back to FastAPI:", supabaseError);
+      console.warn("Supabase search failed, falling back to FastAPI:", supabaseError);
     }
   }
 
   // Fallback to FastAPI backend
-  const response = await fetch(`${API_BASE_URL}/aircraft`);
+  const response = await fetch(`${API_BASE_URL}/aircraft/search?q=${encodeURIComponent(searchTerm)}`);
   
   if (!response.ok) {
-    throw new Error('Failed to fetch aircraft list');
+    return { aircraft: [] }; // Return empty on error rather than throwing
   }
   
   return response.json();
+}
+
+// Keep the old function for backward compatibility, but limit it
+export async function fetchAircraftList() {
+  // For initial load, just return a few recent aircraft or empty array
+  // This encourages users to search rather than loading all data
+  return { aircraft: [] };
 }
 
 export async function fetchInsights(defects) {
