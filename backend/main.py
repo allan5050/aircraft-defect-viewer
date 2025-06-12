@@ -1,5 +1,5 @@
 # main.py
-from fastapi import FastAPI, Query, HTTPException
+from fastapi import FastAPI, Query, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from typing import Optional, List, Dict, Any
@@ -10,6 +10,13 @@ import json
 from pathlib import Path
 from functools import lru_cache
 from analytics import DefectAnalyzer
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+import time
+
+# Rate limiter setup - uses memory storage for development, Redis in production
+limiter = Limiter(key_func=get_remote_address)
 
 # Pydantic models
 class Defect(BaseModel):
@@ -33,6 +40,7 @@ class AnalyticsResponse(BaseModel):
     total_defects: int
     high_severity_count: int
     recent_defects_7d: int
+    total_unique_aircraft: int
 
 class InsightRequest(BaseModel):
     defects: List[Defect]
@@ -43,6 +51,10 @@ app = FastAPI(
     description="API for providing analytics and insights on aircraft maintenance defects. Core defect data is served by Supabase.",
     version="1.0.0"
 )
+
+# Add rate limiting
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Enable CORS for frontend
 app.add_middleware(
@@ -55,6 +67,10 @@ app.add_middleware(
 
 # Database setup - used as fallback when Supabase is not available
 DB_PATH = "defects.db"
+
+# Simple cache variables for analytics
+_last_analytics_result = None
+_last_analytics_time = 0
 
 def init_database():
     """Initialize SQLite database with sample data if it doesn't exist."""
@@ -108,12 +124,15 @@ async def startup_event():
 
 # API Endpoints
 @app.get("/api/health")
-async def health_check():
+@limiter.limit("60/minute")  # Health checks are frequent
+async def health_check(request: Request):
     """Health check endpoint."""
     return {"status": "healthy", "timestamp": datetime.now().isoformat()}
 
 @app.get("/api/defects", response_model=DefectResponse)
+@limiter.limit("120/minute")  # Main data endpoint - higher limit for user interaction
 def get_defects(
+    request: Request,
     aircraft_registration: Optional[str] = Query(None),
     severity: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
@@ -175,7 +194,8 @@ def get_defects(
     )
 
 @app.get("/api/aircraft")
-def get_aircraft():
+@limiter.limit("30/minute")  # Less frequent endpoint
+def get_aircraft(request: Request):
     """Get list of distinct aircraft registrations (fallback endpoint)."""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -188,7 +208,8 @@ def get_aircraft():
     return {"aircraft": aircraft_list}
 
 @app.get("/api/aircraft/search")
-def search_aircraft(q: str = Query(..., min_length=2)):
+@limiter.limit("60/minute")  # Search endpoint - moderate usage
+def search_aircraft(request: Request, q: str = Query(..., min_length=2)):
     """Search aircraft registrations by partial match (fallback endpoint)."""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -206,14 +227,28 @@ def search_aircraft(q: str = Query(..., min_length=2)):
     return {"aircraft": aircraft_list}
 
 @app.get("/api/analytics", response_model=AnalyticsResponse)
-@lru_cache(maxsize=1)  # Cache the analytics result
-def get_analytics():
+@limiter.limit("20/minute")  # Analytics - expensive operation, lower limit
+def get_analytics(request: Request):
     """
     Get defect analytics - optimized for performance.
     Uses database-level calculations instead of fetching all data.
     Cached for 5 minutes to reduce database load.
     """
-    return get_analytics_from_db()
+    global _last_analytics_result, _last_analytics_time
+    
+    current_time = time.time()
+    
+    # Check if we have cached data less than 5 minutes old
+    if (_last_analytics_result is not None and 
+        current_time - _last_analytics_time < 300):  # 5 minutes
+        return _last_analytics_result
+    
+    # Calculate fresh analytics
+    result = get_analytics_from_db()
+    _last_analytics_result = result
+    _last_analytics_time = current_time
+    
+    return result
 
 def get_analytics_from_db():
     """Calculate analytics directly in the database for optimal performance."""
@@ -256,6 +291,10 @@ def get_analytics_from_db():
     """)
     recent_defects = cursor.fetchone()[0]
     
+    # Get total unique aircraft count
+    cursor.execute("SELECT COUNT(DISTINCT aircraft_registration) FROM defects")
+    total_unique_aircraft = cursor.fetchone()[0]
+    
     conn.close()
     
     return AnalyticsResponse(
@@ -263,49 +302,34 @@ def get_analytics_from_db():
         top_aircraft=top_aircraft,
         total_defects=total_defects,
         high_severity_count=high_severity,
-        recent_defects_7d=recent_defects
+        recent_defects_7d=recent_defects,
+        total_unique_aircraft=total_unique_aircraft
     )
 
-# Clear analytics cache every 5 minutes
-@app.middleware("http")
-async def clear_analytics_cache(request, call_next):
-    """Middleware to periodically clear analytics cache for fresh data."""
-    response = await call_next(request)
-    
-    # Clear cache for analytics every 5 minutes (basic time-based cache invalidation)
-    import time
-    if not hasattr(clear_analytics_cache, 'last_clear'):
-        clear_analytics_cache.last_clear = time.time()
-    
-    if time.time() - clear_analytics_cache.last_clear > 300:  # 5 minutes
-        get_analytics.cache_clear()
-        clear_analytics_cache.last_clear = time.time()
-    
-    return response
-
 @app.post("/api/insights")
-async def get_insights(request: InsightRequest):
+@limiter.limit("30/minute")  # Insights - computational endpoint, moderate limit
+async def get_insights(request: Request, insight_request: InsightRequest):
     """
     Run advanced analytics on a given set of defects.
     This uses the manual DefectAnalyzer class.
     """
-    if not request.defects:
+    if not insight_request.defects:
         return {
             "daily_defect_rate": 0.0,
             "total_defects": 0,
             "date_range_days": 0
         }
 
-    analyzer = DefectAnalyzer(defects=[d.dict() for d in request.defects])
+    analyzer = DefectAnalyzer(defects=[d.dict() for d in insight_request.defects])
 
     # Calculate daily defect rate across all aircraft
     daily_rate = analyzer.calculate_daily_defect_rate()
     
     # Additional context information
-    total_defects = len(request.defects)
+    total_defects = len(insight_request.defects)
     
     # Calculate date range for context
-    dates = [analyzer._parse_date(d.reported_at) for d in request.defects]
+    dates = [analyzer._parse_date(d.reported_at) for d in insight_request.defects]
     date_range_days = 0
     if dates:
         min_date = min(dates)

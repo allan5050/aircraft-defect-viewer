@@ -135,7 +135,7 @@ async function calculateAnalyticsFromSupabase() {
     return acc;
   }, {});
 
-  // Calculate top aircraft
+  // Calculate top aircraft and total unique aircraft count
   const aircraftCountsMap = allData.reduce((acc, row) => {
     acc[row.aircraft_registration] = (acc[row.aircraft_registration] || 0) + 1;
     return acc;
@@ -145,6 +145,9 @@ async function calculateAnalyticsFromSupabase() {
     .map(([aircraft, count]) => ({ aircraft, count }))
     .sort((a, b) => b.count - a.count)
     .slice(0, 10);
+
+  // Count of unique aircraft with defects
+  const totalUniqueAircraft = Object.keys(aircraftCountsMap).length;
 
   // Calculate recent defects (last 7 days)
   const sevenDaysAgo = new Date();
@@ -159,6 +162,7 @@ async function calculateAnalyticsFromSupabase() {
     total: allData.length,
     severityDist,
     topAircraftCount: topAircraft.length,
+    totalUniqueAircraft,
     recentDefects
   });
 
@@ -167,25 +171,53 @@ async function calculateAnalyticsFromSupabase() {
     top_aircraft: topAircraft,
     total_defects: allData.length,
     high_severity_count: severityDist['High'] || 0,
-    recent_defects_7d: recentDefects
+    recent_defects_7d: recentDefects,
+    total_unique_aircraft: totalUniqueAircraft
   };
 }
 
 export async function fetchInsights(defects) {
-  // This endpoint processes the current page of defects to generate insights
-  const response = await fetch(`${API_BASE_URL}/insights`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ defects }),
-  });
+  console.log('fetchInsights: Starting request with', defects.length, 'defects');
+  
+  try {
+    // This endpoint processes the current page of defects to generate insights
+    const response = await fetch(`${API_BASE_URL}/insights`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ defects }),
+    });
 
-  if (!response.ok) {
-    throw new Error('Failed to fetch insights');
+    console.log('fetchInsights: Response status:', response.status, response.statusText);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('fetchInsights: Error response:', errorText);
+      
+      if (response.status === 429) {
+        throw new Error('Rate limit exceeded. Please wait a moment and try again.');
+      } else if (response.status >= 500) {
+        throw new Error('Server error. Please try again later.');
+      } else {
+        throw new Error(`HTTP ${response.status}: ${errorText || 'Failed to fetch insights'}`);
+      }
+    }
+
+    const data = await response.json();
+    console.log('fetchInsights: Success, received data:', data);
+    return data;
+    
+  } catch (error) {
+    console.error('fetchInsights: Caught error:', error);
+    
+    // Check if it's a network error
+    if (error.name === 'TypeError' && error.message.includes('fetch')) {
+      throw new Error('Backend server is not responding. Please check if the server is running on port 8000.');
+    }
+    
+    throw error;
   }
-
-  return response.json();
 }
 
 export async function searchAircraft(searchTerm) {

@@ -124,8 +124,8 @@ function DefectAnalytics({ analytics, onRefresh }) {
         <Grid item xs={12} sm={6} md={3}>
           <StatCard
             title="Aircraft Affected"
-            value={analytics.top_aircraft?.length || 0}
-            subtitle="With defects"
+            value={analytics.total_unique_aircraft || 0}
+            subtitle="Unique aircraft with defects"
             icon={<Flight />}
             color="success"
           />
