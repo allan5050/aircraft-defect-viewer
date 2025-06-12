@@ -21,10 +21,11 @@ if (!supabaseUrl || !supabaseServiceKey) {
 }
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
-const dataPath = resolve(__dirname, '../data/SMALL_air_defects.json');
+const dataPath = resolve(__dirname, '../data/aircraft_defects.json');
 
 async function seed() {
   console.log('--- Starting Supabase seeding script ---');
+  console.log('Loading actual aircraft defects data (80,000+ records)...');
   
   try {
     // 1. Read the data file
@@ -41,19 +42,29 @@ async function seed() {
     }
     console.log('Existing data cleared.');
 
-    // 3. Insert new data
-    console.log('Inserting new data...');
-    const { data: insertedData, error: insertError } = await supabase
-      .from('defects')
-      .insert(data)
-      .select();
+    // 3. Insert new data in batches (Supabase has a limit of 1000 rows per insert)
+    console.log('Inserting new data in batches...');
+    const batchSize = 1000;
+    let totalInserted = 0;
 
-    if (insertError) {
-      console.error('Error inserting data:', insertError.message);
-      throw insertError;
+    for (let i = 0; i < data.length; i += batchSize) {
+      const batch = data.slice(i, i + batchSize);
+      console.log(`Inserting batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(data.length / batchSize)} (${batch.length} records)...`);
+      
+      const { data: insertedData, error: insertError } = await supabase
+        .from('defects')
+        .insert(batch);
+
+      if (insertError) {
+        console.error('Error inserting batch:', insertError.message);
+        throw insertError;
+      }
+
+      totalInserted += batch.length;
+      console.log(`✓ Batch completed. Total inserted so far: ${totalInserted}/${data.length}`);
     }
 
-    console.log(`Successfully inserted ${insertedData.length} records.`);
+    console.log(`Successfully inserted all ${totalInserted} records.`);
     console.log('--- Seeding script finished successfully! ---');
 
   } catch (err) {
