@@ -28,32 +28,49 @@ class DefectAnalyzer:
             for aircraft, count in aircraft_counts.most_common(limit)
         ]
     
-    def calculate_mtbf(self, aircraft_registration: str) -> float:
-        """Calculate Mean Time Between Failures for specific aircraft in days."""
-        aircraft_defects = [
-            d for d in self.defects 
-            if d['aircraft_registration'] == aircraft_registration
-        ]
-        
-        if len(aircraft_defects) < 2:
+    def calculate_daily_defect_rate(self) -> float:
+        """Calculate mean reported defects per day across all aircraft."""
+        if not self.defects:
             return 0.0
         
-        # Sort by date
-        sorted_defects = sorted(
-            aircraft_defects, 
-            key=lambda x: datetime.fromisoformat(x['reported_at'].replace('Z', '+00:00'))
-        )
+        # Get all dates
+        dates = [self._parse_date(d['reported_at']) for d in self.defects]
         
-        # Calculate time differences
-        time_diffs = []
-        for i in range(1, len(sorted_defects)):
-            prev_time = datetime.fromisoformat(sorted_defects[i-1]['reported_at'].replace('Z', '+00:00'))
-            curr_time = datetime.fromisoformat(sorted_defects[i]['reported_at'].replace('Z', '+00:00'))
-            diff = (curr_time - prev_time).days
-            if diff > 0:
-                time_diffs.append(diff)
+        if not dates:
+            return 0.0
         
-        return round(sum(time_diffs) / len(time_diffs), 1) if time_diffs else 0.0
+        # Find date range
+        min_date = min(dates)
+        max_date = max(dates)
+        
+        # Calculate total days (add 1 to include both start and end days)
+        total_days = (max_date - min_date).days + 1
+        
+        if total_days <= 0:
+            return len(self.defects)  # All defects on same day
+        
+        # Calculate rate
+        return round(len(self.defects) / total_days, 2)
+    
+    def _parse_date(self, date_str: str) -> datetime:
+        """Parse date string handling various formats."""
+        try:
+            # Handle ISO format with Z suffix
+            if date_str.endswith('Z'):
+                return datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+            # Handle ISO format with timezone
+            elif '+' in date_str or date_str.endswith('00:00'):
+                return datetime.fromisoformat(date_str)
+            # Handle simple format, assume UTC
+            else:
+                return datetime.fromisoformat(date_str).replace(tzinfo=timezone.utc)
+        except Exception as e:
+            # Fallback: try parsing without timezone, then add UTC
+            try:
+                return datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S').replace(tzinfo=timezone.utc)
+            except Exception:
+                # Last resort: parse date only
+                return datetime.strptime(date_str[:10], '%Y-%m-%d').replace(tzinfo=timezone.utc)
     
     def get_defect_trends(self, days: int = 30) -> Dict[str, int]:
         """Get defect count trends over specified days."""
@@ -62,8 +79,7 @@ class DefectAnalyzer:
         trend_data = defaultdict(int)
         
         for defect in self.defects:
-            # The fromisoformat method correctly parses the 'Z' (Zulu time / UTC)
-            defect_date = datetime.fromisoformat(defect['reported_at'])
+            defect_date = self._parse_date(defect['reported_at'])
             
             if defect_date >= cutoff_date:
                 date_key = defect_date.strftime('%Y-%m-%d')

@@ -76,6 +76,21 @@ export async function fetchDefects(params = {}) {
 }
 
 export async function fetchAnalytics() {
+  // Try Supabase first for analytics using SQL aggregation (efficient, no row limits)
+  if (supabase) {
+    try {
+      // Calculate analytics using SQL aggregation queries
+      const analytics = await calculateAnalyticsFromSupabase();
+      if (analytics) {
+        console.log('Successfully calculated analytics from Supabase using SQL aggregation');
+        return analytics;
+      }
+    } catch (supabaseError) {
+      console.warn("Supabase failed, falling back to FastAPI:", supabaseError);
+    }
+  }
+
+  // Fallback to FastAPI backend (with limited SQLite data)
   const response = await fetch(`${API_BASE_URL}/analytics`);
   
   if (!response.ok) {
@@ -83,6 +98,106 @@ export async function fetchAnalytics() {
   }
   
   return response.json();
+}
+
+async function calculateAnalyticsFromSupabase() {
+  // Use pagination to get all data in chunks of 1000
+  let allData = [];
+  let page = 0;
+  const pageSize = 1000;
+  let hasMore = true;
+
+  // Fetch all data in pages
+  while (hasMore) {
+    const { data, error } = await supabase
+      .from('defects')
+      .select('aircraft_registration, severity, reported_at')
+      .range(page * pageSize, (page + 1) * pageSize - 1)
+      .order('reported_at', { ascending: false });
+
+    if (error) throw error;
+    
+    if (data && data.length > 0) {
+      allData.push(...data);
+      hasMore = data.length === pageSize; // Continue if we got a full page
+      page++;
+      console.log(`Fetched page ${page}, total records so far: ${allData.length}`);
+    } else {
+      hasMore = false;
+    }
+  }
+
+  console.log(`Fetched all ${allData.length} records from Supabase in ${page} pages`);
+
+  // Calculate severity distribution
+  const severityDist = allData.reduce((acc, row) => {
+    acc[row.severity] = (acc[row.severity] || 0) + 1;
+    return acc;
+  }, {});
+
+  // Calculate top aircraft
+  const aircraftCountsMap = allData.reduce((acc, row) => {
+    acc[row.aircraft_registration] = (acc[row.aircraft_registration] || 0) + 1;
+    return acc;
+  }, {});
+
+  const topAircraft = Object.entries(aircraftCountsMap)
+    .map(([aircraft, count]) => ({ aircraft, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10);
+
+  // Calculate recent defects (last 7 days)
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  
+  const recentDefects = allData.filter(row => {
+    const defectDate = new Date(row.reported_at);
+    return defectDate >= sevenDaysAgo;
+  }).length;
+
+  return {
+    severity_distribution: severityDist,
+    top_aircraft: topAircraft,
+    total_defects: allData.length,
+    high_severity_count: severityDist['High'] || 0,
+    recent_defects_7d: recentDefects
+  };
+}
+
+function calculateAnalytics(defects) {
+  // Calculate severity distribution
+  const severityDist = defects.reduce((acc, defect) => {
+    acc[defect.severity] = (acc[defect.severity] || 0) + 1;
+    return acc;
+  }, {});
+
+  // Calculate top aircraft
+  const aircraftCounts = defects.reduce((acc, defect) => {
+    acc[defect.aircraft_registration] = (acc[defect.aircraft_registration] || 0) + 1;
+    return acc;
+  }, {});
+  
+  const topAircraft = Object.entries(aircraftCounts)
+    .map(([aircraft, count]) => ({ aircraft, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10);
+
+  // Calculate recent defects (last 7 days)
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  
+  const recentDefects = defects.filter(defect => {
+    const defectDate = new Date(defect.reported_at);
+    return defectDate >= sevenDaysAgo;
+  }).length;
+
+  return {
+    severity_distribution: severityDist,
+    top_aircraft: topAircraft,
+    total_defects: defects.length,
+    high_severity_count: severityDist['High'] || 0,
+    recent_defects_7d: recentDefects
+  };
 }
 
 export async function fetchAircraftList() {

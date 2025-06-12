@@ -59,10 +59,11 @@ function DefectFilters({ filters, onFilterChange }) {
         <Grid item xs={12} sm={4}>
           <Autocomplete
             options={aircraftList}
-            value={localFilters.aircraft_registration}
+            value={localFilters.aircraft_registration || null}
             onChange={(event, newValue) => {
               handleFilterChange('aircraft_registration', newValue || '');
             }}
+            isOptionEqualToValue={(option, value) => option === value}
             renderInput={(params) => (
               <TextField
                 {...params}

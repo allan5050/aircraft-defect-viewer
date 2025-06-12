@@ -110,7 +110,18 @@ Follow these steps to get the project running locally.
     ```bash
     cd backend
     ```
-2.  **Create Environment File**:
+2.  **Set up and activate virtual environment**:
+    ```bash
+    # Create virtual environment (if not already created)
+    python -m venv venv
+
+    # Activate virtual environment
+    # On Windows:
+    venv\Scripts\activate
+    # On macOS/Linux:
+    source venv/bin/activate
+    ```
+3.  **Create Environment File**:
     -   Create a file named `.env` in the `backend/` directory.
     -   Go to your Supabase **Project Settings** > **API** again.
     -   This time, copy the **`service_role` secret key**.
@@ -119,7 +130,7 @@ Follow these steps to get the project running locally.
         SUPABASE_URL=YOUR_SUPABASE_URL
         SUPABASE_SERVICE_KEY=YOUR_SERVICE_ROLE_KEY
         ```
-3.  **Install Dependencies**:
+4.  **Install Dependencies**:
     ```bash
     # Install Python dependencies
     pip install -r requirements.txt
@@ -127,12 +138,12 @@ Follow these steps to get the project running locally.
     # Install Node.js dependencies (for the seeding script)
     npm install
     ```
-4.  **Seed the Database**:
+5.  **Seed the Database**:
     -   Run the seeding script to populate your Supabase table with the sample data. This script will delete any existing data before inserting the new records.
     ```bash
     node seed_supabase.mjs
     ```
-5.  **Run the Analytics Server**:
+6.  **Run the Analytics Server**:
     ```bash
     uvicorn main:app --reload --port 8000
     ```

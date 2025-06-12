@@ -246,25 +246,31 @@ async def get_insights(request: InsightRequest):
     """
     if not request.defects:
         return {
-            "mtbf": {},
-            "top_aircraft_with_mtbf": "N/A"
+            "daily_defect_rate": 0.0,
+            "total_defects": 0,
+            "date_range_days": 0
         }
 
     analyzer = DefectAnalyzer(defects=[d.dict() for d in request.defects])
 
-    # Calculate MTBF for top aircraft in the provided list
-    top_aircraft = analyzer.get_top_problematic_aircraft(limit=1)
-    mtbf_results = {}
-    top_aircraft_reg = "N/A"
-
-    if top_aircraft:
-        top_aircraft_reg = top_aircraft[0]['aircraft']
-        mtbf = analyzer.calculate_mtbf(aircraft_registration=top_aircraft_reg)
-        mtbf_results[top_aircraft_reg] = mtbf
+    # Calculate daily defect rate across all aircraft
+    daily_rate = analyzer.calculate_daily_defect_rate()
+    
+    # Additional context information
+    total_defects = len(request.defects)
+    
+    # Calculate date range for context
+    dates = [analyzer._parse_date(d.reported_at) for d in request.defects]
+    date_range_days = 0
+    if dates:
+        min_date = min(dates)
+        max_date = max(dates)
+        date_range_days = (max_date - min_date).days + 1
 
     return {
-        "mtbf": mtbf_results,
-        "top_aircraft_with_mtbf": top_aircraft_reg
+        "daily_defect_rate": daily_rate,
+        "total_defects": total_defects,
+        "date_range_days": date_range_days
     }
 
 # Run with: uvicorn main:app --reload --port 8000

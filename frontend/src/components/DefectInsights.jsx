@@ -59,9 +59,18 @@ function DefectInsights({ defects }) {
     }
   }, [defects]);
 
-  const mtbfValue = insights?.mtbf && Object.values(insights.mtbf)[0]
-    ? `${Object.values(insights.mtbf)[0]} days`
-    : 'N/A';
+  const dailyRateValue = (() => {
+    if (!insights || insights.daily_defect_rate === undefined) return 'N/A';
+    const rate = insights.daily_defect_rate;
+    if (rate === 0) return '0 defects/day';
+    return `${rate} defects/day`;
+  })();
+
+  const getSubtitle = () => {
+    if (!insights) return 'Based on current data';
+    const { total_defects, date_range_days } = insights;
+    return `${total_defects} defects over ${date_range_days} days in current view`;
+  };
 
   return (
     <Box sx={{ mb: 4 }}>
@@ -82,9 +91,9 @@ function DefectInsights({ defects }) {
             <Grid container spacing={2}>
                 <Grid item xs={12}>
                     <StatCard
-                        title="Mean Time Between Failures (MTBF)"
-                        value={mtbfValue}
-                        subtitle={`For aircraft ${insights.top_aircraft_with_mtbf}, based on current data`}
+                        title="Mean Daily Defect Rate"
+                        value={dailyRateValue}
+                        subtitle={getSubtitle()}
                         icon={<Speed color="primary" />}
                     />
                 </Grid>
