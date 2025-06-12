@@ -1,0 +1,211 @@
+[
+  {
+    "id": "ug5hfzx4",
+    "aircraft_registration": "ME-AAS",
+    "reported_at": "2024-07-20T12:59:37.142000Z",
+    "defect_type": "Vibration anomaly",
+    "description": "Unusual vibration detected in engine nacelle.",
+    "severity": "Medium"
+  },
+  {
+    "id": "n8mbej6t",
+    "aircraft_registration": "YG-DSZ",
+    "reported_at": "2025-04-05T03:13:19.142000Z",
+    "defect_type": "Vibration anomaly",
+    "description": "Unusual vibration detected in engine nacelle.",
+    "severity": "High"
+  },
+  {
+    "id": "o2brr9yc",
+    "aircraft_registration": "NQ-BCS",
+    "reported_at": "2025-05-29T19:37:32.142000Z",
+    "defect_type": "Oil pressure anomaly",
+    "description": "Oil pressure readings outside normal range.",
+    "severity": "High"
+  },
+  {
+    "id": "wphsmvsz",
+    "aircraft_registration": "RB-MRU",
+    "reported_at": "2025-02-10T14:00:09.142000Z",
+    "defect_type": "Hydraulic leak",
+    "description": "Leak in hydraulic system affecting actuator performance.",
+    "severity": "Low"
+  },
+  {
+    "id": "x9dtfivr",
+    "aircraft_registration": "LU-OEC",
+    "reported_at": "2025-05-17T16:48:11.142000Z",
+    "defect_type": "Fan blade damage",
+    "description": "Fan blade chipped due to foreign object ingestion.",
+    "severity": "Medium"
+  },
+  {
+    "id": "b714igco",
+    "aircraft_registration": "NT-VTG",
+    "reported_at": "2024-07-01T03:19:26.142000Z",
+    "defect_type": "Fan blade damage",
+    "description": "Fan blade chipped due to foreign object ingestion.",
+    "severity": "High"
+  },
+  {
+    "id": "z09iasqs",
+    "aircraft_registration": "BS-OSF",
+    "reported_at": "2025-04-06T18:26:14.142000Z",
+    "defect_type": "Compressor stall",
+    "description": "Compressor stall detected during climb phase.",
+    "severity": "Medium"
+  },
+  {
+    "id": "xg4d14a4",
+    "aircraft_registration": "BS-STB",
+    "reported_at": "2024-11-10T04:39:23.142000Z",
+    "defect_type": "Fan blade damage",
+    "description": "Fan blade chipped due to foreign object ingestion.",
+    "severity": "High"
+  },
+  {
+    "id": "f6r6v3ou",
+    "aircraft_registration": "CP-NSB",
+    "reported_at": "2025-04-09T01:29:18.142000Z",
+    "defect_type": "Compressor stall",
+    "description": "Compressor stall detected during climb phase.",
+    "severity": "Medium"
+  },
+  {
+    "id": "0k862ku1",
+    "aircraft_registration": "SI-WCB",
+    "reported_at": "2024-11-19T02:09:29.142000Z",
+    "defect_type": "Compressor stall",
+    "description": "Compressor stall detected during climb phase.",
+    "severity": "Low"
+  },
+  {
+    "id": "ln7w9gez",
+    "aircraft_registration": "NY-VDW",
+    "reported_at": "2025-03-13T14:11:53.142000Z",
+    "defect_type": "Hydraulic leak",
+    "description": "Leak in hydraulic system affecting actuator performance.",
+    "severity": "Medium"
+  },
+  {
+    "id": "q3x564ly",
+    "aircraft_registration": "AD-ACN",
+    "reported_at": "2024-08-22T16:47:10.142000Z",
+    "defect_type": "Fan blade damage",
+    "description": "Fan blade chipped due to foreign object ingestion.",
+    "severity": "Medium"
+  },
+  {
+    "id": "48jkilf7",
+    "aircraft_registration": "HL-BRW",
+    "reported_at": "2024-09-23T00:26:33.142000Z",
+    "defect_type": "Fuel pump failure",
+    "description": "Fuel pump malfunction causing inconsistent fuel delivery.",
+    "severity": "Low"
+  },
+  {
+    "id": "w09e0je3",
+    "aircraft_registration": "QA-OGA",
+    "reported_at": "2025-06-06T16:27:40.142000Z",
+    "defect_type": "Oil pressure anomaly",
+    "description": "Oil pressure readings outside normal range.",
+    "severity": "High"
+  },
+  
+  {
+    "id": "zwy5bmot",
+    "aircraft_registration": "QZ-ETT",
+    "reported_at": "2024-11-13T13:42:55.142000Z",
+    "defect_type": "Throttle control issue",
+    "description": "Throttle response delayed during engine test.",
+    "severity": "Medium"
+  },
+  {
+    "id": "1nz0o4mf",
+    "aircraft_registration": "DG-EKY",
+    "reported_at": "2025-01-11T09:12:54.142000Z",
+    "defect_type": "Fuel pump failure",
+    "description": "Fuel pump malfunction causing inconsistent fuel delivery.",
+    "severity": "Medium"
+  },
+  {
+    "id": "e83wrrof",
+    "aircraft_registration": "ZJ-IXC",
+    "reported_at": "2024-06-14T08:23:16.142000Z",
+    "defect_type": "Oil pressure anomaly",
+    "description": "Oil pressure readings outside normal range.",
+    "severity": "Medium"
+  },
+  {
+    "id": "36zzpgtr",
+    "aircraft_registration": "HR-KYT",
+    "reported_at": "2024-07-14T16:13:28.142000Z",
+    "defect_type": "Ignition system fault",
+    "description": "Ignition system failed to initiate combustion.",
+    "severity": "Low"
+  },
+  {
+    "id": "6x5vw2rn",
+    "aircraft_registration": "BW-TOK",
+    "reported_at": "2024-11-21T04:23:42.142000Z",
+    "defect_type": "Hydraulic leak",
+    "description": "Leak in hydraulic system affecting actuator performance.",
+    "severity": "High"
+  },
+  {
+    "id": "a1g0b2en",
+    "aircraft_registration": "JO-NUB",
+    "reported_at": "2024-11-29T22:21:19.142000Z",
+    "defect_type": "Exhaust gas temperature spike",
+    "description": "Unexpected spike in exhaust gas temperature.",
+    "severity": "High"
+  },
+  {
+    "id": "65zwhf5j",
+    "aircraft_registration": "BQ-VPW",
+    "reported_at": "2024-10-07T00:52:43.142000Z",
+    "defect_type": "Ignition system fault",
+    "description": "Ignition system failed to initiate combustion.",
+    "severity": "Medium"
+  },
+  {
+    "id": "vbv65jii",
+    "aircraft_registration": "TH-KOF",
+    "reported_at": "2024-07-14T10:37:49.142000Z",
+    "defect_type": "Ignition system fault",
+    "description": "Ignition system failed to initiate combustion.",
+    "severity": "High"
+  },
+  {
+    "id": "5xwwt90x",
+    "aircraft_registration": "WN-LTX",
+    "reported_at": "2025-06-04T02:02:54.142000Z",
+    "defect_type": "Hydraulic leak",
+    "description": "Leak in hydraulic system affecting actuator performance.",
+    "severity": "High"
+  },
+  {
+    "id": "cu57enc7",
+    "aircraft_registration": "NS-JEZ",
+    "reported_at": "2024-07-20T18:59:03.142000Z",
+    "defect_type": "Compressor stall",
+    "description": "Compressor stall detected during climb phase.",
+    "severity": "Low"
+  },
+  {
+    "id": "bgbmhvjc",
+    "aircraft_registration": "GL-LMY",
+    "reported_at": "2025-01-29T00:39:40.142000Z",
+    "defect_type": "Ignition system fault",
+    "description": "Ignition system failed to initiate combustion.",
+    "severity": "Low"
+  },
+  {
+    "id": "e7oy7ca8",
+    "aircraft_registration": "XU-WCL",
+    "reported_at": "2024-06-18T00:40:25.142000Z",
+    "defect_type": "Hydraulic leak",
+    "description": "Leak in hydraulic system affecting actuator performance.",
+    "severity": "Low"
+  }
+]
