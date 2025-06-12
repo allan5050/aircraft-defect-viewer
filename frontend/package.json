@@ -15,12 +15,16 @@
       "@emotion/react": "^11.11.0",
       "@emotion/styled": "^11.11.0",
       "@mui/icons-material": "^5.14.0",
-      "date-fns": "^2.30.0"
+      "date-fns": "^2.30.0",
+      "@tanstack/react-query": "^5.0.0",
+      "react-window": "^1.8.8",
+      "react-window-infinite-loader": "^1.0.9"
     },
     "devDependencies": {
       "@types/react": "^18.2.0",
       "@types/react-dom": "^18.2.0",
       "@vitejs/plugin-react": "^4.0.0",
-      "vite": "^4.4.0"
+      "vite": "^4.4.0",
+      "@types/react-window": "^1.8.8"
     }
   }

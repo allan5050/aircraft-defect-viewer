@@ -1,15 +1,10 @@
 // App.jsx
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import {
   Container,
   Paper,
   Typography,
   Box,
-  Grid,
-  Card,
-  CardContent,
-  Chip,
-  CircularProgress,
   Alert
 } from '@mui/material';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
@@ -18,7 +13,7 @@ import DefectTable from './components/DefectTable';
 import DefectFilters from './components/DefectFilters';
 import DefectAnalytics from './components/DefectAnalytics';
 import DefectInsights from './components/DefectInsights';
-import { fetchDefects, fetchAnalytics } from './api/defectApi';
+import { useDefectsPaginated, useAnalytics } from './hooks/useDefects';
 
 const theme = createTheme({
   palette: {
@@ -42,74 +37,43 @@ const theme = createTheme({
 });
 
 function App() {
-  const [defects, setDefects] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [filters, setFilters] = useState({
     aircraft_registration: '',
     severity: ''
   });
-  const [pagination, setPagination] = useState({
-    page: 1,
-    pageSize: 50,
-    total: 0,
-    hasMore: false
-  });
-  const [analytics, setAnalytics] = useState(null);
+  const [page, setPage] = useState(1);
 
-  // Load defects
-  const loadDefects = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const response = await fetchDefects({
-        ...filters,
-        page: pagination.page,
-        page_size: pagination.pageSize
-      });
-      
-      setDefects(response.data);
-      setPagination({
-        page: response.page,
-        pageSize: response.page_size,
-        total: response.total,
-        hasMore: response.has_more
-      });
-    } catch (err) {
-      setError('Failed to load defects. Please try again.');
-      console.error('Error loading defects:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [filters, pagination.page, pagination.pageSize]);
+  // Use TanStack Query hooks for data fetching
+  const { 
+    data: defectsResponse, 
+    isLoading: defectsLoading, 
+    error: defectsError 
+  } = useDefectsPaginated(filters, page);
 
-  // Load analytics
-  const loadAnalytics = useCallback(async () => {
-    try {
-      const data = await fetchAnalytics();
-      setAnalytics(data);
-    } catch (err) {
-      console.error('Error loading analytics:', err);
-    }
-  }, []);
-
-  // Initial load
-  useEffect(() => {
-    loadDefects();
-    loadAnalytics();
-  }, [loadDefects, loadAnalytics]);
+  const { 
+    data: analytics, 
+    isLoading: analyticsLoading,
+    refreshAnalytics 
+  } = useAnalytics();
 
   // Handle filter changes
   const handleFilterChange = (newFilters) => {
     setFilters(newFilters);
-    setPagination(prev => ({ ...prev, page: 1 })); // Reset to first page
+    setPage(1); // Reset to first page
   };
 
   // Handle page change
   const handlePageChange = (newPage) => {
-    setPagination(prev => ({ ...prev, page: newPage }));
+    setPage(newPage);
   };
+
+  const defects = defectsResponse?.data || [];
+  const pagination = defectsResponse ? {
+    page: defectsResponse.page,
+    pageSize: defectsResponse.page_size,
+    total: defectsResponse.total,
+    hasMore: defectsResponse.has_more
+  } : { page: 1, pageSize: 50, total: 0, hasMore: false };
 
   return (
     <ThemeProvider theme={theme}>
@@ -126,8 +90,11 @@ function App() {
         </Box>
 
         {/* Analytics Dashboard */}
-        {analytics && (
-          <DefectAnalytics analytics={analytics} />
+        {analytics && !analyticsLoading && (
+          <DefectAnalytics 
+            analytics={analytics} 
+            onRefresh={refreshAnalytics}
+          />
         )}
 
         {/* Manual Code Insights */}
@@ -142,24 +109,19 @@ function App() {
           />
 
           {/* Error Alert */}
-          {error && (
+          {defectsError && (
             <Alert severity="error" sx={{ mb: 2 }}>
-              {error}
+              Failed to load defects. Please try again.
             </Alert>
           )}
 
           {/* Defects Table */}
-          {loading ? (
-            <Box display="flex" justifyContent="center" py={4}>
-              <CircularProgress />
-            </Box>
-          ) : (
-            <DefectTable
-              defects={defects}
-              pagination={pagination}
-              onPageChange={handlePageChange}
-            />
-          )}
+          <DefectTable
+            defects={defects}
+            pagination={pagination}
+            onPageChange={handlePageChange}
+            loading={defectsLoading}
+          />
         </Paper>
       </Container>
     </ThemeProvider>

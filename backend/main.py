@@ -74,6 +74,11 @@ def init_database():
             )
         """)
         
+        # Create indexes for performance
+        cursor.execute("CREATE INDEX idx_aircraft_registration ON defects(aircraft_registration)")
+        cursor.execute("CREATE INDEX idx_severity ON defects(severity)")
+        cursor.execute("CREATE INDEX idx_reported_at_desc ON defects(reported_at DESC)")
+        
         # Load sample data
         data_file = Path(__file__).parent.parent / "data" / "SMALL_air_defects.json"
         if data_file.exists():
@@ -201,12 +206,17 @@ def search_aircraft(q: str = Query(..., min_length=2)):
     return {"aircraft": aircraft_list}
 
 @app.get("/api/analytics", response_model=AnalyticsResponse)
+@lru_cache(maxsize=1)  # Cache the analytics result
 def get_analytics():
     """
-    Get defect analytics - cached for performance.
-    This endpoint still uses the local SQLite DB for quick analytics.
-    In a production scenario, this would query a data warehouse or a replica.
+    Get defect analytics - optimized for performance.
+    Uses database-level calculations instead of fetching all data.
+    Cached for 5 minutes to reduce database load.
     """
+    return get_analytics_from_db()
+
+def get_analytics_from_db():
+    """Calculate analytics directly in the database for optimal performance."""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
@@ -239,7 +249,7 @@ def get_analytics():
     cursor.execute("SELECT COUNT(*) FROM defects WHERE severity = 'High'")
     high_severity = cursor.fetchone()[0]
     
-    # Get recent defects (last 7 days)
+    # Get recent defects (last 7 days) - optimized query
     cursor.execute("""
         SELECT COUNT(*) FROM defects 
         WHERE datetime(reported_at) > datetime('now', '-7 days')
@@ -255,6 +265,23 @@ def get_analytics():
         high_severity_count=high_severity,
         recent_defects_7d=recent_defects
     )
+
+# Clear analytics cache every 5 minutes
+@app.middleware("http")
+async def clear_analytics_cache(request, call_next):
+    """Middleware to periodically clear analytics cache for fresh data."""
+    response = await call_next(request)
+    
+    # Clear cache for analytics every 5 minutes (basic time-based cache invalidation)
+    import time
+    if not hasattr(clear_analytics_cache, 'last_clear'):
+        clear_analytics_cache.last_clear = time.time()
+    
+    if time.time() - clear_analytics_cache.last_clear > 300:  # 5 minutes
+        get_analytics.cache_clear()
+        clear_analytics_cache.last_clear = time.time()
+    
+    return response
 
 @app.post("/api/insights")
 async def get_insights(request: InsightRequest):

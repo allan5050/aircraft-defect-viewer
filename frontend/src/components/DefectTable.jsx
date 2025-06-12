@@ -1,4 +1,3 @@
-
 // components/DefectTable.jsx
 import React, { useState } from 'react';
 import {
@@ -15,7 +14,9 @@ import {
   Collapse,
   Box,
   Typography,
-  Tooltip
+  Tooltip,
+  CircularProgress,
+  Skeleton
 } from '@mui/material';
 import {
   KeyboardArrowDown,
@@ -36,6 +37,18 @@ const getSeverityColor = (severity) => {
       return 'default';
   }
 };
+
+function DefectRowSkeleton() {
+  return (
+    <TableRow>
+      <TableCell><Skeleton width={40} height={40} /></TableCell>
+      <TableCell><Skeleton width={120} /></TableCell>
+      <TableCell><Skeleton width={150} /></TableCell>
+      <TableCell><Skeleton width={80} /></TableCell>
+      <TableCell><Skeleton width={100} /></TableCell>
+    </TableRow>
+  );
+}
 
 function DefectRow({ defect }) {
   const [open, setOpen] = useState(false);
@@ -98,10 +111,35 @@ function DefectRow({ defect }) {
   );
 }
 
-function DefectTable({ defects, pagination, onPageChange }) {
+function DefectTable({ defects, pagination, onPageChange, loading = false }) {
   const handleChangePage = (event, newPage) => {
     onPageChange(newPage + 1); // MUI uses 0-based, our API uses 1-based
   };
+
+  if (loading && defects.length === 0) {
+    return (
+      <Paper>
+        <TableContainer>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell width={60} />
+                <TableCell>Aircraft</TableCell>
+                <TableCell>Defect Type</TableCell>
+                <TableCell>Severity</TableCell>
+                <TableCell>Reported Date</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {Array.from({ length: 5 }).map((_, index) => (
+                <DefectRowSkeleton key={index} />
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
+    );
+  }
 
   return (
     <Paper>
@@ -120,6 +158,16 @@ function DefectTable({ defects, pagination, onPageChange }) {
             {defects.map((defect) => (
               <DefectRow key={defect.id} defect={defect} />
             ))}
+            {loading && defects.length > 0 && (
+              <TableRow>
+                <TableCell colSpan={5} sx={{ textAlign: 'center', py: 2 }}>
+                  <CircularProgress size={24} />
+                  <Typography variant="body2" sx={{ ml: 1, display: 'inline' }}>
+                    Loading...
+                  </Typography>
+                </TableCell>
+              </TableRow>
+            )}
           </TableBody>
         </Table>
       </TableContainer>

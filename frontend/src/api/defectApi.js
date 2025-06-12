@@ -76,21 +76,17 @@ export async function fetchDefects(params = {}) {
 }
 
 export async function fetchAnalytics() {
-  // Try Supabase first for analytics using SQL aggregation (efficient, no row limits)
+  // Try Supabase first with working analytics logic, fallback to FastAPI
   if (supabase) {
     try {
-      // Calculate analytics using SQL aggregation queries
-      const analytics = await calculateAnalyticsFromSupabase();
-      if (analytics) {
-        console.log('Successfully calculated analytics from Supabase using SQL aggregation');
-        return analytics;
-      }
+      // Use the working chunked approach for analytics
+      return await calculateAnalyticsFromSupabase();
     } catch (supabaseError) {
-      console.warn("Supabase failed, falling back to FastAPI:", supabaseError);
+      console.warn("Supabase analytics failed, falling back to FastAPI:", supabaseError);
     }
   }
 
-  // Fallback to FastAPI backend (with limited SQLite data)
+  // Fallback to FastAPI backend (already optimized with database-level calculations)
   const response = await fetch(`${API_BASE_URL}/analytics`);
   
   if (!response.ok) {
@@ -101,13 +97,15 @@ export async function fetchAnalytics() {
 }
 
 async function calculateAnalyticsFromSupabase() {
-  // Use pagination to get all data in chunks of 1000
+  // Use pagination to get all data in efficient chunks
   let allData = [];
   let page = 0;
-  const pageSize = 1000;
+  const pageSize = 1000; // Good balance between efficiency and memory usage
   let hasMore = true;
 
-  // Fetch all data in pages
+  console.log('Starting analytics calculation from Supabase...');
+
+  // Fetch all data in pages - this ensures we get complete analytics
   while (hasMore) {
     const { data, error } = await supabase
       .from('defects')
@@ -121,13 +119,15 @@ async function calculateAnalyticsFromSupabase() {
       allData.push(...data);
       hasMore = data.length === pageSize; // Continue if we got a full page
       page++;
-      console.log(`Fetched page ${page}, total records so far: ${allData.length}`);
+      if (page % 5 === 0) { // Log progress every 5 pages (5000 records)
+        console.log(`Fetched page ${page}, total records so far: ${allData.length}`);
+      }
     } else {
       hasMore = false;
     }
   }
 
-  console.log(`Fetched all ${allData.length} records from Supabase in ${page} pages`);
+  console.log(`Analytics: Fetched all ${allData.length} records from Supabase in ${page} pages`);
 
   // Calculate severity distribution
   const severityDist = allData.reduce((acc, row) => {
@@ -155,6 +155,13 @@ async function calculateAnalyticsFromSupabase() {
     return defectDate >= sevenDaysAgo;
   }).length;
 
+  console.log('Analytics calculated:', {
+    total: allData.length,
+    severityDist,
+    topAircraftCount: topAircraft.length,
+    recentDefects
+  });
+
   return {
     severity_distribution: severityDist,
     top_aircraft: topAircraft,
@@ -164,40 +171,21 @@ async function calculateAnalyticsFromSupabase() {
   };
 }
 
-function calculateAnalytics(defects) {
-  // Calculate severity distribution
-  const severityDist = defects.reduce((acc, defect) => {
-    acc[defect.severity] = (acc[defect.severity] || 0) + 1;
-    return acc;
-  }, {});
+export async function fetchInsights(defects) {
+  // This endpoint processes the current page of defects to generate insights
+  const response = await fetch(`${API_BASE_URL}/insights`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ defects }),
+  });
 
-  // Calculate top aircraft
-  const aircraftCounts = defects.reduce((acc, defect) => {
-    acc[defect.aircraft_registration] = (acc[defect.aircraft_registration] || 0) + 1;
-    return acc;
-  }, {});
-  
-  const topAircraft = Object.entries(aircraftCounts)
-    .map(([aircraft, count]) => ({ aircraft, count }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 10);
+  if (!response.ok) {
+    throw new Error('Failed to fetch insights');
+  }
 
-  // Calculate recent defects (last 7 days)
-  const sevenDaysAgo = new Date();
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-  
-  const recentDefects = defects.filter(defect => {
-    const defectDate = new Date(defect.reported_at);
-    return defectDate >= sevenDaysAgo;
-  }).length;
-
-  return {
-    severity_distribution: severityDist,
-    top_aircraft: topAircraft,
-    total_defects: defects.length,
-    high_severity_count: severityDist['High'] || 0,
-    recent_defects_7d: recentDefects
-  };
+  return response.json();
 }
 
 export async function searchAircraft(searchTerm) {
@@ -240,20 +228,4 @@ export async function fetchAircraftList() {
   // For initial load, just return a few recent aircraft or empty array
   // This encourages users to search rather than loading all data
   return { aircraft: [] };
-}
-
-export async function fetchInsights(defects) {
-  const response = await fetch(`${API_BASE_URL}/insights`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ defects }),
-  });
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch insights');
-  }
-
-  return response.json();
 }
