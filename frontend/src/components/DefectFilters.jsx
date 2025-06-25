@@ -15,7 +15,9 @@ import {
 import { Search, Clear } from '@mui/icons-material';
 import { searchAircraft } from '../api/defectApi';
 
-// Debounce function to limit API calls
+// Debounce function to limit API calls during typing.
+// This prevents excessive server requests while the user is actively typing,
+// which is essential for scalability with large datasets.
 function debounce(func, wait) {
   let timeout;
   return function executedFunction(...args) {
@@ -31,9 +33,12 @@ function debounce(func, wait) {
 function DefectFilters({ filters, onFilterChange }) {
   const [aircraftOptions, setAircraftOptions] = useState([]);
   const [aircraftSearchLoading, setAircraftSearchLoading] = useState(false);
+  // Local state to manage form inputs before they're applied to the main filter state.
+  // This provides a better UX by allowing users to make multiple changes before applying.
   const [localFilters, setLocalFilters] = useState(filters);
 
-  // Debounced search for aircraft
+  // Debounced search for aircraft - waits 300ms after user stops typing.
+  // This is a key performance optimization that reduces API load.
   const debouncedSearchAircraft = useCallback(
     debounce(async (searchTerm) => {
       if (searchTerm && searchTerm.length >= 2) {
@@ -87,6 +92,8 @@ function DefectFilters({ filters, onFilterChange }) {
     <Box sx={{ mb: 3 }}>
       <Grid container spacing={2} alignItems="center">
         <Grid item xs={12} sm={4}>
+          {/* Autocomplete with server-side search for scalability.
+              Avoids loading all aircraft registrations at once. */}
           <Autocomplete
             options={aircraftOptions}
             value={localFilters.aircraft_registration || null}

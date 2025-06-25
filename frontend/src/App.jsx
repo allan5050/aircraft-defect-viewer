@@ -1,4 +1,5 @@
 // App.jsx
+// This component acts as the central orchestrator for the entire frontend application.
 import React, { useState } from 'react';
 import {
   Container,
@@ -41,11 +42,15 @@ const theme = createTheme({
 });
 
 function App() {
+  // Core application state for filters and pagination mode.
+  // This state is "lifted up" to be shared across components.
   const [filters, setFilters] = useState({
     aircraft_registration: '',
     severity: ''
   });
   const [page, setPage] = useState(1);
+  
+  // State to toggle between pagination and high-performance virtual scrolling.
   const [virtualMode, setVirtualMode] = useState(false);
 
   // Use TanStack Query hooks for data fetching
@@ -57,6 +62,7 @@ function App() {
   } = useDefectsPaginated(filters, page);
 
   // Virtual scrolling mode - infinite query
+  // Fetches data in pages for an "infinite" list.
   const {
     data: infiniteData,
     isLoading: infiniteLoading,
@@ -84,6 +90,7 @@ function App() {
   };
 
   // Prepare data based on mode
+  // The UI transparently uses data from either the paginated or infinite query.
   const defects = virtualMode 
     ? infiniteData?.pages?.flatMap(page => page.data) || []
     : defectsResponse?.data || [];
@@ -204,6 +211,7 @@ function App() {
           )}
 
           {/* Defects Table - Switch between regular and virtualized */}
+          {/* Conditional rendering based on the virtualMode state. */}
           {virtualMode ? (
             <VirtualizedDefectTable
               defects={defects}

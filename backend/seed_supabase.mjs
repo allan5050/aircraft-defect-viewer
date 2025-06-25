@@ -42,7 +42,9 @@ async function seed() {
     }
     console.log('Existing data cleared.');
 
-    // 3. Insert new data in batches (Supabase has a limit of 1000 rows per insert)
+    // 3. Insert new data in batches. This is critical for large datasets.
+    // Most database APIs have a limit on payload size or row count per request.
+    // Batching avoids timeouts and errors.
     console.log('Inserting new data in batches...');
     const batchSize = 1000;
     let totalInserted = 0;

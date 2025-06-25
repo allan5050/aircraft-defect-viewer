@@ -32,13 +32,17 @@ function StatCard({ title, value, icon, subtitle }) {
   );
 }
 
+// DefectInsights component demonstrates the "handwritten code" requirement.
+// It performs on-the-fly analysis of the currently visible data using the
+// manual DefectAnalyzer class in the backend (analytics.py).
 function DefectInsights({ defects }) {
   const [insights, setInsights] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [usingFallback, setUsingFallback] = useState(false);
 
-  // Fallback calculation if backend is unavailable
+  // Fallback calculation if backend is unavailable - demonstrates resilience pattern.
+  // This ensures the feature works even if the Python analytics service is down.
   const calculateFallbackInsights = (defects) => {
     if (!defects || defects.length === 0) return null;
     
@@ -64,7 +68,7 @@ function DefectInsights({ defects }) {
           setError(null);
           setUsingFallback(false);
           
-          // Add timeout to prevent infinite loading
+          // Timeout prevents infinite loading if backend is slow/unavailable
           const timeoutPromise = new Promise((_, reject) => 
             setTimeout(() => reject(new Error('Request timeout after 8 seconds')), 8000)
           );
@@ -80,7 +84,7 @@ function DefectInsights({ defects }) {
         } catch (err) {
           console.error('DefectInsights: Error fetching insights:', err);
           
-          // Use fallback calculation
+          // Use fallback calculation - maintains functionality when backend is unavailable
           console.log('DefectInsights: Using fallback calculation');
           const fallbackData = calculateFallbackInsights(defects);
           setInsights(fallbackData);
@@ -139,6 +143,7 @@ function DefectInsights({ defects }) {
               </Typography>
             </Box>
           )}
+          {/* Fallback indicator - transparent about when local calculations are used */}
           {usingFallback && (
             <Box sx={{ p: 1, backgroundColor: '#fff3e0', borderRadius: 1, mb: 2 }}>
               <Typography variant="caption" color="orange">

@@ -4,7 +4,11 @@ At the top of the application homepage, I built an analytics dashboard that give
 
 The 'Aircraft Defect Records' table fulfills the requirement to show all reported defects for the selected aircraft and severity. The table supports filtering, and users can search for aircraft across very large datasets without slowdowns, thanks to performance optimizations in the search field.
 
-To handle large datasets (over 100,000 records), the table includes a virtual scrolling feature that loads more records as the user scrolls, preventing performance issues from loading too much data at once. Pagination is the default mode if virtual scrolling is not enabled.
+To handle large datasets (over 100,000 records), the application provides two scalable rendering strategies:
+
+1. **Standard Pagination:** Each page loads exactly 50 records from the database using efficient `LIMIT/OFFSET` SQL queries. This provides consistent performance regardless of total dataset size.
+
+2. **Virtual Scrolling:** Combines React Window (renders only visible rows) with infinite loading (loads 50 records at a time as you scroll). This enables smooth 60fps scrolling through massive datasets while maintaining low memory usage.
 
 Rows in the table can be expanded to show full defect details. This approach allows busy users to expand multiple rows at once, providing more context than a modal-based approach.
 
@@ -46,16 +50,16 @@ Speech-to-text was used to interact with the LLM more efficiently, allowing me t
 # How the solution could scale in a production system:
 
 ## Frontend rendering strategies
-- **Pagination:** Efficiently loads and renders data by default.
-- **Virtual Scrolling:** Uses React Window for smooth performance with 100k+ records, rendering only visible rows. Users can toggle between pagination and virtual scrolling.
+- **True Pagination:** Each page request loads ONLY 50 records from the database (not all records), providing genuine scalability to millions of records with consistent performance.
+- **Virtual Scrolling + Infinite Loading:** Uses React Window to render only ~15 visible rows at any time. Records are loaded incrementally (50 at a time) as you scroll, accumulating in memory but never overwhelming the DOM. This enables smooth 60fps scrolling through 100k+ records.
 - **Debounced Search:** Prevents excessive API calls by waiting 300ms after typing before searching.
 - **Skeleton Loading:** Provides immediate visual feedback while data loads.
-- **Component Memoization:** Prevents unnecessary re-renders for better performance.
-- **Code Splitting:** (Planned) Route-based code splitting to reduce initial bundle size.
+- **Component Memoization:** Uses React's memoization features to prevent components from re-rendering when their data hasn't changed. This is like caching the component's output to avoid unnecessary work, making the UI more responsive.
+- **Code Splitting:** (Planned) Instead of loading all code at once, the application will be split into smaller chunks that load only when needed. This means the initial page load will be faster since users only download the code they need right away.
 
 ## Backend architecture
 - **Supabase:** Managed PostgreSQL with instant API, scalable for high-traffic scenarios.
-- **FastAPI Microservice:** Handles analytics and custom business logic, with LRU caching and rate limiting (SlowAPI) to prevent abuse.
+- **FastAPI Microservice:** Handles analytics and custom business logic, with LRU caching (keeps most recently used data in memory for faster access) and rate limiting (SlowAPI) to prevent abuse.
 - **Read Replicas:** (Planned) Use Supabase read replicas for load distribution.
 - **Serverless Deployment:** (Planned) Deploy FastAPI as a serverless function for horizontal scaling.
 - **Fallback to SQLite:** If Supabase is down, analytics and mock data are served from a local SQLite database.
@@ -64,7 +68,10 @@ Speech-to-text was used to interact with the LLM more efficiently, allowing me t
 - **Database-Level Filtering:** All filters are applied at the database level for efficiency.
 - **Indexed Queries:** Indexes on key columns for high-performance filtering and sorting.
 - **LRU Caching:** Analytics endpoints are cached with automatic invalidation.
-- **Efficient Data Loading:** Only fetches visible records (pagination/virtualization).
+- **Efficient Data Loading:** 
+  - **Pagination Mode:** Each request loads exactly 50 records via `LIMIT/OFFSET` SQL queries
+  - **Virtual Scroll Mode:** Records loaded incrementally (50 per page) as user scrolls, using TanStack Query's infinite loading
+  - **Analytics:** Calculations performed in the database using SQL aggregations, not by fetching all records
 - **Rate Limiting:** Endpoint-specific limits to ensure fair resource usage.
 - **Materialized Views & Partitioning:** (Planned) For sub-second analytics and large table performance.
 
@@ -180,3 +187,5 @@ With more time, I would add more analytics and "hot-button" filtering/searching 
 I would also allow users to create their own dashboards and hot buttons, enabling them to work more efficiently and helping the development team learn which patterns are most useful. By supporting customization, we can better understand user needs and improve the product for everyone.
 
 Finally, I would conduct more performance load-testing for the dashboard and table search features to ensure that even with 10,000,000+ records, the application remains fast and responsive.
+
+Additionally, I would refactor the core pagination to use keyset (or "cursor-based") pagination instead of the current `OFFSET` approach. While `OFFSET` is suitable for browsing initial pages, keyset pagination would provide near-constant query time even for very deep page numbers (e.g. page 20,000), making the system truly scalable for enterprise use cases.

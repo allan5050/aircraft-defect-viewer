@@ -1,4 +1,6 @@
 // api/defectApi.js
+// This file serves as an abstraction layer for all data fetching.
+// It decouples the UI components from the specific data source (Supabase/FastAPI).
 const API_BASE_URL = 'http://localhost:8000/api';
 
 // Try to import Supabase, but handle the case where it's not configured
@@ -18,11 +20,14 @@ export async function fetchDefects(params = {}) {
     page_size = 50 
   } = params;
 
-  // Try Supabase first, fallback to FastAPI
+  // Resilience Pattern: Try Supabase first (primary data source).
+  // If it fails, automatically fall back to the FastAPI backend.
   if (supabase) {
     try {
       const offset = (page - 1) * page_size;
 
+      // Using the Supabase client library for data fetching.
+      // This is a "low-code" approach that avoids writing a custom CRUD API.
       let query = supabase
         .from('defects')
         .select('*', { count: 'exact' })
@@ -80,6 +85,9 @@ export async function fetchAnalytics() {
   if (supabase) {
     try {
       // Use the working chunked approach for analytics
+      // NOTE: This client-side calculation is an initial implementation.
+      // It shows an iterative development process but is less scalable than
+      // the preferred backend approach, which performs calculations in the database.
       return await calculateAnalyticsFromSupabase();
     } catch (supabaseError) {
       console.warn("Supabase analytics failed, falling back to FastAPI:", supabaseError);

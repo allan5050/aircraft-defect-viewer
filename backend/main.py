@@ -68,12 +68,16 @@ app.add_middleware(
 # Database setup - used as fallback when Supabase is not available
 DB_PATH = "defects.db"
 
-# Simple cache variables for analytics
+# Simple in-memory cache for analytics to reduce database load.
+# In production, this would be a distributed cache like Redis.
 _last_analytics_result = None
 _last_analytics_time = 0
 
 def init_database():
-    """Initialize SQLite database with sample data if it doesn't exist."""
+    """
+    Initialize SQLite database. This is the core of the fallback system.
+    If the primary DB (Supabase) is down, the API can still serve mock data.
+    """
     if not Path(DB_PATH).exists():
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
@@ -124,13 +128,13 @@ async def startup_event():
 
 # API Endpoints
 @app.get("/api/health")
-@limiter.limit("60/minute")  # Health checks are frequent
+@limiter.limit("60/minute")  # Health checks can be frequent.
 async def health_check(request: Request):
     """Health check endpoint."""
     return {"status": "healthy", "timestamp": datetime.now().isoformat()}
 
 @app.get("/api/defects", response_model=DefectResponse)
-@limiter.limit("120/minute")  # Main data endpoint - higher limit for user interaction
+@limiter.limit("120/minute")  # Main data endpoint - higher limit for user interaction.
 def get_defects(
     request: Request,
     aircraft_registration: Optional[str] = Query(None),
@@ -138,7 +142,13 @@ def get_defects(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=100)
 ):
-    """Get defects with optional filtering and pagination (fallback endpoint)."""
+    """
+    Get defects with optional filtering and pagination (fallback endpoint).
+    
+    PERFORMANCE OPTIMIZATION: This endpoint only queries the specific page of records
+    requested (e.g., 50 records), NOT all records. This is true pagination that
+    scales to millions of records.
+    """
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
@@ -156,12 +166,13 @@ def get_defects(
     
     where_clause = " WHERE " + " AND ".join(conditions) if conditions else ""
     
-    # Get total count
+    # Step 1: Get total count (lightweight query for pagination info)
     count_query = f"SELECT COUNT(*) FROM defects{where_clause}"
     cursor.execute(count_query, params)
     total = cursor.fetchone()[0]
     
-    # Get paginated data
+    # Step 2: Get ONLY the requested page of data (e.g., records 51-100 for page 2)
+    # This is genuine pagination - we DON'T load all records into memory
     offset = (page - 1) * page_size
     data_query = f"""
         SELECT id, aircraft_registration, reported_at, defect_type, description, severity
@@ -169,6 +180,7 @@ def get_defects(
         ORDER BY reported_at DESC
         LIMIT ? OFFSET ?
     """
+    # LIMIT 50 OFFSET 0 (page 1), LIMIT 50 OFFSET 50 (page 2), etc.
     cursor.execute(data_query, params + [page_size, offset])
     
     defects = [
@@ -194,7 +206,7 @@ def get_defects(
     )
 
 @app.get("/api/aircraft")
-@limiter.limit("30/minute")  # Less frequent endpoint
+@limiter.limit("30/minute")  # Less frequent endpoint.
 def get_aircraft(request: Request):
     """Get list of distinct aircraft registrations (fallback endpoint)."""
     conn = sqlite3.connect(DB_PATH)
@@ -208,7 +220,7 @@ def get_aircraft(request: Request):
     return {"aircraft": aircraft_list}
 
 @app.get("/api/aircraft/search")
-@limiter.limit("60/minute")  # Search endpoint - moderate usage
+@limiter.limit("60/minute")  # Search endpoint - moderate usage.
 def search_aircraft(request: Request, q: str = Query(..., min_length=2)):
     """Search aircraft registrations by partial match (fallback endpoint)."""
     conn = sqlite3.connect(DB_PATH)
@@ -227,12 +239,12 @@ def search_aircraft(request: Request, q: str = Query(..., min_length=2)):
     return {"aircraft": aircraft_list}
 
 @app.get("/api/analytics", response_model=AnalyticsResponse)
-@limiter.limit("20/minute")  # Analytics - expensive operation, lower limit
+@limiter.limit("20/minute")  # Analytics is expensive, so it has a lower limit.
 def get_analytics(request: Request):
     """
     Get defect analytics - optimized for performance.
     Uses database-level calculations instead of fetching all data.
-    Cached for 5 minutes to reduce database load.
+    Cached for 5 minutes to reduce database load in a multi-user environment.
     """
     global _last_analytics_result, _last_analytics_time
     
@@ -243,7 +255,7 @@ def get_analytics(request: Request):
         current_time - _last_analytics_time < 300):  # 5 minutes
         return _last_analytics_result
     
-    # Calculate fresh analytics
+    # If cache is stale or empty, calculate fresh analytics.
     result = get_analytics_from_db()
     _last_analytics_result = result
     _last_analytics_time = current_time
@@ -251,11 +263,14 @@ def get_analytics(request: Request):
     return result
 
 def get_analytics_from_db():
-    """Calculate analytics directly in the database for optimal performance."""
+    """
+    Calculate analytics directly in the database for optimal performance.
+    This avoids pulling thousands of records into memory, which is highly scalable.
+    """
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
-    # Get severity distribution
+    # Get severity distribution using efficient SQL aggregation.
     cursor.execute("""
         SELECT severity, COUNT(*) as count 
         FROM defects 
@@ -263,7 +278,7 @@ def get_analytics_from_db():
     """)
     severity_dist = {row[0]: row[1] for row in cursor.fetchall()}
     
-    # Get top problematic aircraft
+    # Get top problematic aircraft using GROUP BY, ORDER BY, and LIMIT.
     cursor.execute("""
         SELECT aircraft_registration, COUNT(*) as defect_count 
         FROM defects 
@@ -284,14 +299,14 @@ def get_analytics_from_db():
     cursor.execute("SELECT COUNT(*) FROM defects WHERE severity = 'High'")
     high_severity = cursor.fetchone()[0]
     
-    # Get recent defects (last 7 days) - optimized query
+    # Get recent defects (last 7 days) - optimized with date functions.
     cursor.execute("""
         SELECT COUNT(*) FROM defects 
         WHERE datetime(reported_at) > datetime('now', '-7 days')
     """)
     recent_defects = cursor.fetchone()[0]
     
-    # Get total unique aircraft count
+    # Get total unique aircraft count efficiently.
     cursor.execute("SELECT COUNT(DISTINCT aircraft_registration) FROM defects")
     total_unique_aircraft = cursor.fetchone()[0]
     
@@ -307,7 +322,7 @@ def get_analytics_from_db():
     )
 
 @app.post("/api/insights")
-@limiter.limit("30/minute")  # Insights - computational endpoint, moderate limit
+@limiter.limit("30/minute")  # Insights is a computational endpoint.
 async def get_insights(request: Request, insight_request: InsightRequest):
     """
     Run advanced analytics on a given set of defects.

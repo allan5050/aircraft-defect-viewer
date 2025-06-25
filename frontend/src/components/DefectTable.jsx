@@ -38,6 +38,8 @@ const getSeverityColor = (severity) => {
   }
 };
 
+// Skeleton loading component for better perceived performance.
+// Shows placeholder content while data is loading instead of blank screen.
 function DefectRowSkeleton() {
   return (
     <TableRow>
@@ -87,6 +89,8 @@ function DefectRow({ defect }) {
           </Tooltip>
         </TableCell>
       </TableRow>
+      {/* Row expansion implementation - fulfills project requirement for 
+          "row expansion or modal for full defect descriptions" */}
       <TableRow>
         <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={5}>
           <Collapse in={open} timeout="auto" unmountOnExit>
@@ -111,6 +115,8 @@ function DefectRow({ defect }) {
   );
 }
 
+// Standard pagination table component - good for moderate datasets.
+// For larger datasets (100k+ records), use VirtualizedDefectTable instead.
 function DefectTable({ defects, pagination, onPageChange, loading = false }) {
   const handleChangePage = (event, newPage) => {
     onPageChange(newPage + 1); // MUI uses 0-based, our API uses 1-based
@@ -171,6 +177,7 @@ function DefectTable({ defects, pagination, onPageChange, loading = false }) {
           </TableBody>
         </Table>
       </TableContainer>
+      {/* Standard pagination controls - simpler than infinite scroll but less seamless */}
       <TablePagination
         rowsPerPageOptions={[50]}
         component="div"

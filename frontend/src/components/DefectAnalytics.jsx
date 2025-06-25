@@ -1,4 +1,6 @@
 // components/DefectAnalytics.jsx
+// This component provides the high-level analytics dashboard that gives users
+// a quick overview of key metrics before diving into the detailed table data.
 import React from 'react';
 import {
   Grid,
@@ -48,6 +50,9 @@ function StatCard({ title, value, subtitle, icon, color = 'primary' }) {
   );
 }
 
+// Main analytics dashboard component.
+// Displays key metrics that help users identify critical issues quickly,
+// supporting the business requirement for "structured data exchange" insights.
 function DefectAnalytics({ analytics, onRefresh }) {
   // Debug logging to help troubleshoot
   React.useEffect(() => {
@@ -77,6 +82,7 @@ function DefectAnalytics({ analytics, onRefresh }) {
         <Typography variant="h5" gutterBottom>
           Analytics Dashboard
         </Typography>
+        {/* Manual refresh capability gives users control over data freshness */}
         {onRefresh && (
           <Tooltip title="Refresh Analytics Data">
             <IconButton onClick={onRefresh} color="primary">
@@ -87,6 +93,7 @@ function DefectAnalytics({ analytics, onRefresh }) {
       </Box>
       
       <Grid container spacing={3}>
+        {/* Key performance indicators arranged for quick scanning */}
         {/* Total Defects */}
         <Grid item xs={12} sm={6} md={3}>
           <StatCard
@@ -98,7 +105,7 @@ function DefectAnalytics({ analytics, onRefresh }) {
           />
         </Grid>
 
-        {/* High Severity */}
+        {/* High Severity - most critical metric for maintenance teams */}
         <Grid item xs={12} sm={6} md={3}>
           <StatCard
             title="High Severity"
@@ -131,7 +138,7 @@ function DefectAnalytics({ analytics, onRefresh }) {
           />
         </Grid>
 
-        {/* Severity Distribution */}
+        {/* Severity Distribution - visual breakdown for quick assessment */}
         <Grid item xs={12} md={6}>
           <Card>
             <CardContent>
@@ -160,7 +167,7 @@ function DefectAnalytics({ analytics, onRefresh }) {
           </Card>
         </Grid>
 
-        {/* Top Aircraft */}
+        {/* Top Aircraft - identifies which aircraft need immediate attention */}
         <Grid item xs={12} md={6}>
           <Card>
             <CardContent>

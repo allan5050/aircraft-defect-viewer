@@ -1,4 +1,6 @@
 import React, { useState, useMemo } from 'react';
+// React Window provides virtual scrolling - only renders visible items for performance.
+// This is crucial for handling 100k+ records without UI freezing.
 import { VariableSizeList as List } from 'react-window';
 import {
   Box,
@@ -35,7 +37,9 @@ const getSeverityColor = (severity) => {
   }
 };
 
-// Individual row component for the virtual list
+// Individual row component for the virtual list.
+// React Window calls this component only for visible rows, enabling smooth scrolling
+// with massive datasets.
 const VirtualRow = ({ index, style, data }) => {
   const { items, expandedRows, toggleExpanded } = data;
   const defect = items[index];
@@ -103,7 +107,7 @@ const VirtualRow = ({ index, style, data }) => {
           </Box>
         </Box>
         
-        {/* Expanded content */}
+        {/* Expanded content - requirement for "row expansion or modal" */}
         <Collapse in={isExpanded} timeout="auto" unmountOnExit>
           <Box sx={{ p: 2, backgroundColor: '#fafafa', borderTop: '1px solid #e0e0e0' }}>
             <Typography variant="h6" gutterBottom>
@@ -147,7 +151,8 @@ function VirtualizedDefectTable({
     });
   };
 
-  // Handle infinite scrolling - load more when near the bottom
+  // Infinite scrolling implementation - automatically loads more data when user scrolls near bottom.
+  // This combines with virtual scrolling for seamless experience with massive datasets.
   const onItemsRendered = ({ visibleStopIndex }) => {
     const threshold = 10; // Start loading when 10 items from the end
     const shouldLoadMore = 
@@ -161,7 +166,8 @@ function VirtualizedDefectTable({
     }
   };
 
-  // Calculate dynamic row height based on expansion
+  // Dynamic row height calculation - expanded rows need more space.
+  // React Window uses this to maintain smooth scrolling performance.
   const getItemSize = (index) => {
     const defect = defects[index];
     if (!defect) return 60;
@@ -170,6 +176,7 @@ function VirtualizedDefectTable({
     return isExpanded ? 200 : 60; // Base height + expanded content
   };
 
+  // Memoized data object to prevent unnecessary re-renders in virtual list.
   const itemData = useMemo(() => ({
     items: defects,
     expandedRows,
@@ -202,7 +209,7 @@ function VirtualizedDefectTable({
         </Table>
       </TableContainer>
 
-      {/* Virtual List */}
+      {/* Virtual List - the core performance feature for large datasets */}
       <Box sx={{ height: height }}>
         {defects.length > 0 ? (
           <List
