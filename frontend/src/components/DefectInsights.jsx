@@ -1,121 +1,111 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
+import PropTypes from 'prop-types';
+import { useQuery } from '@tanstack/react-query';
 import {
   Card,
   CardContent,
   Typography,
   Box,
   CircularProgress,
-  Chip,
-  Grid
+  Grid,
+  Alert
 } from '@mui/material';
-import { Speed } from '@mui/icons-material';
-import { fetchInsights } from '../api/defectApi';
+import { Speed, ErrorOutline } from '@mui/icons-material';
+import { getInsights } from '../api/dataService';
+import StatCard from './StatCard';
 
-function StatCard({ title, value, icon, subtitle }) {
-  return (
-    <Box>
-      <Typography color="textSecondary" gutterBottom variant="body2">
-        {title}
-      </Typography>
-      <Box display="flex" alignItems="center" gap={2}>
-        {icon}
-        <Typography variant="h5" component="div">
-          {value}
-        </Typography>
-      </Box>
-      {subtitle && (
-        <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-          {subtitle}
-        </Typography>
-      )}
-    </Box>
-  );
+/**
+ * Performs a client-side calculation of insights as a fallback.
+ * This ensures the component remains functional even if the backend service is down.
+ * @param {Array} defects - An array of defect objects.
+ * @returns {object|null} The calculated insights or null if not possible.
+ */
+const calculateFallbackInsights = (defects) => {
+  if (!defects || defects.length === 0) return null;
+  
+  const dates = defects.map(d => new Date(d.reported_at)).sort((a, b) => a - b);
+  if(dates.length === 0) return null;
+
+  const minDate = dates[0];
+  const maxDate = dates[dates.length - 1];
+  const daysDiff = Math.max(1, Math.ceil((maxDate - minDate) / (1000 * 60 * 60 * 24)) + 1);
+  const dailyRate = Math.round((defects.length / daysDiff) * 100) / 100;
+  
+  return {
+    daily_defect_rate: dailyRate,
+    total_defects: defects.length,
+    date_range_days: daysDiff,
+    isFallback: true, // Flag to indicate local calculation
+  };
+};
+
+/**
+ * A hook for fetching insights data, with client-side fallback logic.
+ * @param {Array} defects - The list of defects to analyze.
+ */
+function useInsights(defects) {
+    return useQuery({
+        queryKey: ['insights', defects.map(d => d.id)],
+        queryFn: () => getInsights(defects),
+        enabled: defects && defects.length > 0,
+        retry: 1, // Only retry once
+        staleTime: 5 * 60 * 1000, // 5 minutes
+        refetchOnWindowFocus: false,
+        refetchOnMount: true,
+    });
 }
 
-// DefectInsights component demonstrates the "handwritten code" requirement.
-// It performs on-the-fly analysis of the currently visible data using the
-// manual DefectAnalyzer class in the backend (analytics.py).
+
+/**
+ * Displays on-the-fly analysis of the currently visible data.
+ * This demonstrates the "handwritten code" requirement by calling a custom
+ * analytics endpoint and providing a client-side fallback calculation.
+ */
 function DefectInsights({ defects }) {
-  const [insights, setInsights] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [usingFallback, setUsingFallback] = useState(false);
+  const { data: insights, isLoading, isError, error } = useInsights(defects);
 
-  // Fallback calculation if backend is unavailable - demonstrates resilience pattern.
-  // This ensures the feature works even if the Python analytics service is down.
-  const calculateFallbackInsights = (defects) => {
-    if (!defects || defects.length === 0) return null;
-    
-    const dates = defects.map(d => new Date(d.reported_at)).sort((a, b) => a - b);
-    const minDate = dates[0];
-    const maxDate = dates[dates.length - 1];
-    const daysDiff = Math.max(1, Math.ceil((maxDate - minDate) / (1000 * 60 * 60 * 24)) + 1);
-    const dailyRate = Math.round((defects.length / daysDiff) * 100) / 100;
-    
-    return {
-      daily_defect_rate: dailyRate,
-      total_defects: defects.length,
-      date_range_days: daysDiff
-    };
-  };
+  const finalInsights = isError ? calculateFallbackInsights(defects) : insights;
 
-  useEffect(() => {
-    if (defects && defects.length > 0) {
-      const getInsights = async () => {
-        try {
-          console.log('DefectInsights: Starting to fetch insights for', defects.length, 'defects');
-          setLoading(true);
-          setError(null);
-          setUsingFallback(false);
-          
-          // Timeout prevents infinite loading if backend is slow/unavailable
-          const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Request timeout after 8 seconds')), 8000)
-          );
-          
-          const data = await Promise.race([
-            fetchInsights(defects),
-            timeoutPromise
-          ]);
-          
-          console.log('DefectInsights: Successfully received insights:', data);
-          setInsights(data);
-          setError(null);
-        } catch (err) {
-          console.error('DefectInsights: Error fetching insights:', err);
-          
-          // Use fallback calculation - maintains functionality when backend is unavailable
-          console.log('DefectInsights: Using fallback calculation');
-          const fallbackData = calculateFallbackInsights(defects);
-          setInsights(fallbackData);
-          setUsingFallback(true);
-          setError(`Using local calculation: ${err.message || 'Backend unavailable'}`);
-        } finally {
-          setLoading(false);
-        }
-      };
-      getInsights();
-    } else {
-      console.log('DefectInsights: No defects provided, skipping insights');
-      setLoading(false);
-      setInsights(null);
-      setError(null);
-      setUsingFallback(false);
+  const renderContent = () => {
+    if (isLoading) {
+      return (
+        <Box display="flex" flexDirection="column" alignItems="center" py={4}>
+          <CircularProgress />
+          <Typography variant="body2" sx={{ mt: 2 }} color="textSecondary">
+            Calculating insights...
+          </Typography>
+        </Box>
+      );
     }
-  }, [defects]);
+    
+    if (!finalInsights) {
+      return <Typography color="textSecondary">Not enough data in the current view to calculate insights.</Typography>;
+    }
 
-  const dailyRateValue = (() => {
-    if (!insights || insights.daily_defect_rate === undefined) return 'N/A';
-    const rate = insights.daily_defect_rate;
-    if (rate === 0) return '0 defects/day';
-    return `${rate} defects/day`;
-  })();
+    const dailyRateValue = `${finalInsights.daily_defect_rate ?? 'N/A'} defects/day`;
+    const subtitle = `${finalInsights.total_defects} defects over ${finalInsights.date_range_days} days in current view`;
 
-  const getSubtitle = () => {
-    if (!insights) return 'Based on current data';
-    const { total_defects, date_range_days } = insights;
-    const fallbackText = usingFallback ? ' (local calculation)' : '';
-    return `${total_defects} defects over ${date_range_days} days in current view${fallbackText}`;
+    return (
+      <>
+        {isError && (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              Could not connect to the analytics service. Displaying a local calculation.
+              <br/>
+              <Typography variant="caption">{error.message}</Typography>
+            </Alert>
+        )}
+        <Grid container spacing={2}>
+            <Grid item xs={12}>
+                <StatCard
+                    title="Mean Daily Defect Rate"
+                    value={dailyRateValue}
+                    subtitle={subtitle}
+                    icon={<Speed color="primary" />}
+                />
+            </Grid>
+        </Grid>
+      </>
+    );
   };
 
   return (
@@ -125,51 +115,18 @@ function DefectInsights({ defects }) {
           Manual Code Insights (Python)
         </Typography>
         <CardContent>
-          {loading && (
-            <Box display="flex" flexDirection="column" alignItems="center" py={4}>
-              <CircularProgress />
-              <Typography variant="body2" sx={{ mt: 2 }} color="textSecondary">
-                Calculating insights...
-              </Typography>
-            </Box>
-          )}
-          {error && !usingFallback && (
-            <Box sx={{ p: 2, backgroundColor: '#ffebee', borderRadius: 1 }}>
-              <Typography color="error" variant="body2">
-                {error}
-              </Typography>
-              <Typography variant="caption" color="textSecondary" sx={{ mt: 1, display: 'block' }}>
-                This might be due to rate limiting or backend connectivity issues.
-              </Typography>
-            </Box>
-          )}
-          {/* Fallback indicator - transparent about when local calculations are used */}
-          {usingFallback && (
-            <Box sx={{ p: 1, backgroundColor: '#fff3e0', borderRadius: 1, mb: 2 }}>
-              <Typography variant="caption" color="orange">
-                ⚠️ Using local calculation (backend unavailable)
-              </Typography>
-            </Box>
-          )}
-          {!loading && insights && (
-            <Grid container spacing={2}>
-                <Grid item xs={12}>
-                    <StatCard
-                        title="Mean Daily Defect Rate"
-                        value={dailyRateValue}
-                        subtitle={getSubtitle()}
-                        icon={<Speed color="primary" />}
-                    />
-                </Grid>
-            </Grid>
-          )}
-           {!loading && !error && !insights && (
-             <Typography color="textSecondary">Not enough data in the current view to calculate insights.</Typography>
-          )}
+          {renderContent()}
         </CardContent>
       </Card>
     </Box>
   );
 }
+
+DefectInsights.propTypes = {
+  /**
+   * An array of defect objects to be analyzed.
+   */
+  defects: PropTypes.arrayOf(PropTypes.object).isRequired,
+};
 
 export default DefectInsights; 

@@ -2,8 +2,10 @@
 import json
 import random
 import string
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict
+from pathlib import Path
+from collections import Counter
 
 def generate_aircraft_registration() -> str:
     """Generate realistic aircraft registration."""
@@ -12,15 +14,25 @@ def generate_aircraft_registration() -> str:
     prefix = random.choice(prefixes)
     
     # Generate suffix
-    if prefix in ['N', 'JA']:  # US and Japan use numbers
+    if prefix in ['N']:
         suffix = ''.join(random.choices(string.digits, k=4)) + random.choice(string.ascii_uppercase)
-    else:  # Others use letters
+    elif prefix == 'JA':
+        suffix = ''.join(random.choices(string.digits, k=4))
+    else:
         suffix = ''.join(random.choices(string.ascii_uppercase, k=3))
     
-    return prefix + suffix
+    return f"{prefix}{suffix}"
 
 def generate_defects(count: int = 10000) -> List[Dict]:
-    """Generate realistic defect data."""
+    """
+    Generates a specified number of realistic-looking aircraft defect records.
+
+    Args:
+        count: The number of defect records to generate.
+
+    Returns:
+        A list of dictionaries, where each dictionary is a defect record.
+    """
     
     # Define defect types and their descriptions
     defect_types = {
@@ -97,35 +109,27 @@ def generate_defects(count: int = 10000) -> List[Dict]:
     defects = []
     
     # Generate defects over the past 2 years
-    end_date = datetime.now()
+    end_date = datetime.now(timezone.utc)
     start_date = end_date - timedelta(days=730)
     
-    for i in range(count):
-        # Random timestamp within date range
+    for _ in range(count):
+        # Generate a random timestamp within the last two years
         time_between_dates = end_date - start_date
-        days_between_dates = time_between_dates.days
-        random_number_of_days = random.randrange(days_between_dates)
-        random_date = start_date + timedelta(days=random_number_of_days)
-        
-        # Add random time of day
-        random_hour = random.randint(0, 23)
-        random_minute = random.randint(0, 59)
-        random_second = random.randint(0, 59)
-        timestamp = random_date.replace(
-            hour=random_hour, 
-            minute=random_minute, 
-            second=random_second
-        )
+        random_seconds = random.randrange(int(time_between_dates.total_seconds()))
+        timestamp = start_date + timedelta(seconds=random_seconds)
         
         # Select defect type and description
         defect_type = random.choice(list(defect_types.keys()))
         description = random.choice(defect_types[defect_type])
         
+        # Create a unique ID for the defect
+        defect_id = ''.join(random.choices(string.ascii_lowercase + string.digits, k=8))
+
         # Create defect record
         defect = {
-            "id": ''.join(random.choices(string.ascii_lowercase + string.digits, k=8)),
+            "id": defect_id,
             "aircraft_registration": random.choice(aircraft_fleet),
-            "reported_at": timestamp.isoformat() + "Z",
+            "reported_at": timestamp.isoformat(),
             "defect_type": defect_type,
             "description": description,
             "severity": random.choices(severities, weights=severity_weights)[0]
@@ -133,42 +137,39 @@ def generate_defects(count: int = 10000) -> List[Dict]:
         
         defects.append(defect)
     
-    # Sort by date (more realistic)
+    # Sort by date to simulate a realistic sequence of reports
     defects.sort(key=lambda x: x['reported_at'])
     
     return defects
 
 def main():
-    """Generate and save defect data."""
+    """Generates and saves a dataset of defect records."""
     print("Generating 10,000 defect records...")
-    defects = generate_defects(10000)
+    defects_data = generate_defects(10000)
     
+    # Define the output path using pathlib for cross-platform compatibility
+    output_path = Path(__file__).parent.parent / "data" / "large_aircraft_defects.json"
+    output_path.parent.mkdir(exist_ok=True) # Ensure the 'data' directory exists
+
     # Save to file
-    with open('../data/large_aircraft_defects.json', 'w') as f:
-        json.dump(defects, f, indent=2)
+    with open(output_path, 'w', encoding='utf-8') as f:
+        json.dump(defects_data, f, indent=2)
     
-    print(f"Generated {len(defects)} defect records")
-    print(f"Date range: {defects[0]['reported_at']} to {defects[-1]['reported_at']}")
+    print(f"Successfully generated {len(defects_data)} defect records.")
+    if defects_data:
+        print(f"Date range: {defects_data[0]['reported_at']} to {defects_data[-1]['reported_at']}")
     
-    # Print statistics
-    severity_counts = {}
-    aircraft_counts = {}
-    
-    for defect in defects:
-        # Count severities
-        severity = defect['severity']
-        severity_counts[severity] = severity_counts.get(severity, 0) + 1
-        
-        # Count per aircraft
-        aircraft = defect['aircraft_registration']
-        aircraft_counts[aircraft] = aircraft_counts.get(aircraft, 0) + 1
-    
+    # Calculate and print statistics using collections.Counter for conciseness
+    severity_counts = Counter(d['severity'] for d in defects_data)
+    aircraft_counts = Counter(d['aircraft_registration'] for d in defects_data)
+
     print("\nSeverity distribution:")
     for severity, count in severity_counts.items():
-        print(f"  {severity}: {count} ({count/len(defects)*100:.1f}%)")
+        print(f"  {severity}: {count} ({count/len(defects_data)*100:.1f}%)")
     
-    print(f"\nTotal aircraft in fleet: {len(aircraft_counts)}")
-    print(f"Average defects per aircraft: {len(defects) / len(aircraft_counts):.1f}")
+    print(f"\nTotal unique aircraft in fleet: {len(aircraft_counts)}")
+    if aircraft_counts:
+        print(f"Average defects per aircraft: {len(defects_data) / len(aircraft_counts):.1f}")
 
 if __name__ == "__main__":
     main()

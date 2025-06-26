@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
+import PropTypes from 'prop-types';
 // React Window provides virtual scrolling - only renders visible items for performance.
 // This is crucial for handling 100k+ records without UI freezing.
 import { VariableSizeList as List } from 'react-window';
@@ -22,7 +23,10 @@ import {
   KeyboardArrowUp,
   FlightTakeoff
 } from '@mui/icons-material';
-import { format } from 'date-fns';
+import { format, isValid } from 'date-fns';
+import { VIRTUALIZED_TABLE_CONFIG } from '../config';
+
+const TABLE_HEADERS = ['Aircraft', 'Defect Type', 'Severity', 'Reported Date'];
 
 const getSeverityColor = (severity) => {
   switch (severity) {
@@ -37,18 +41,31 @@ const getSeverityColor = (severity) => {
   }
 };
 
-// Individual row component for the virtual list.
-// React Window calls this component only for visible rows, enabling smooth scrolling
-// with massive datasets.
-const VirtualRow = ({ index, style, data }) => {
+const formatDisplayDate = (dateString) => {
+  const date = new Date(dateString);
+  return isValid(date) ? format(date, 'MMM dd, yyyy') : '';
+};
+
+const formatTooltipDate = (dateString) => {
+  const date = new Date(dateString);
+  return isValid(date) ? date.toLocaleString() : '';
+};
+
+/**
+ * Renders a single row for the virtualized list.
+ * React Window calls this component only for rows that are currently visible,
+ * which is the key to its performance with large datasets.
+ */
+function VirtualRow({ index, style, data }) {
   const { items, expandedRows, toggleExpanded } = data;
   const defect = items[index];
-  const isExpanded = expandedRows.has(defect.id);
+  const isExpanded = defect ? expandedRows.has(defect.id) : false;
 
+  // Render a loading placeholder if the defect data for this index hasn't been loaded yet
   if (!defect) {
     return (
       <div style={style}>
-        <Box sx={{ display: 'flex', alignItems: 'center', p: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', p: 2, height: '100%' }}>
           <CircularProgress size={20} />
           <Typography sx={{ ml: 1 }}>Loading...</Typography>
         </Box>
@@ -58,56 +75,15 @@ const VirtualRow = ({ index, style, data }) => {
 
   return (
     <div style={style}>
-      <Box sx={{ 
-        borderBottom: '1px solid #e0e0e0',
-        '&:hover': { backgroundColor: '#f5f5f5' }
-      }}>
-        {/* Main row */}
-        <Box sx={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          p: 2, 
-          minHeight: 60 
-        }}>
-          <IconButton
-            size="small"
-            onClick={() => toggleExpanded(defect.id)}
-            sx={{ mr: 2 }}
-          >
-            {isExpanded ? <KeyboardArrowUp /> : <KeyboardArrowDown />}
-          </IconButton>
-          
-          <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 150, mr: 3 }}>
-            <FlightTakeoff fontSize="small" color="action" sx={{ mr: 1 }} />
-            <Typography variant="body2" fontWeight="medium">
-              {defect.aircraft_registration}
-            </Typography>
-          </Box>
-          
-          <Box sx={{ minWidth: 200, mr: 3 }}>
-            <Typography variant="body2">
-              {defect.defect_type}
-            </Typography>
-          </Box>
-          
-          <Box sx={{ minWidth: 100, mr: 3 }}>
-            <Chip
-              label={defect.severity}
-              color={getSeverityColor(defect.severity)}
-              size="small"
-            />
-          </Box>
-          
-          <Box sx={{ minWidth: 120 }}>
-            <Tooltip title={new Date(defect.reported_at).toLocaleString()}>
-              <Typography variant="body2">
-                {format(new Date(defect.reported_at), 'MMM dd, yyyy')}
-              </Typography>
-            </Tooltip>
-          </Box>
+      <Box sx={{ borderBottom: '1px solid #e0e0e0', '&:hover': { backgroundColor: '#f5f5f5' } }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', p: 1, pl: 2, minHeight: VIRTUALIZED_TABLE_CONFIG.ROW_HEIGHT }}>
+          <Box sx={{ width: 40 }}><IconButton size="small" onClick={() => toggleExpanded(defect.id)}>{isExpanded ? <KeyboardArrowUp /> : <KeyboardArrowDown />}</IconButton></Box>
+          <Box sx={{ flex: '1 1 20%', display: 'flex', alignItems: 'center' }}><FlightTakeoff fontSize="small" color="action" sx={{ mr: 1 }} /> <Typography variant="body2" fontWeight="medium">{defect.aircraft_registration}</Typography></Box>
+          <Box sx={{ flex: '1 1 30%' }}><Typography variant="body2">{defect.defect_type}</Typography></Box>
+          <Box sx={{ flex: '1 1 15%' }}><Chip label={defect.severity} color={getSeverityColor(defect.severity)} size="small" /></Box>
+          <Box sx={{ flex: '1 1 20%' }}><Tooltip title={formatTooltipDate(defect.reported_at)}><Typography variant="body2">{formatDisplayDate(defect.reported_at)}</Typography></Tooltip></Box>
         </Box>
         
-        {/* Expanded content - requirement for "row expansion or modal" */}
         <Collapse in={isExpanded} timeout="auto" unmountOnExit>
           <Box sx={{ p: 2, backgroundColor: '#fafafa', borderTop: '1px solid #e0e0e0' }}>
             <Typography variant="h6" gutterBottom>
@@ -120,15 +96,30 @@ const VirtualRow = ({ index, style, data }) => {
               <strong>Description:</strong> {defect.description}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              <strong>Reported:</strong> {new Date(defect.reported_at).toLocaleString()}
+              <strong>Reported:</strong> {formatTooltipDate(defect.reported_at)}
             </Typography>
           </Box>
         </Collapse>
       </Box>
     </div>
   );
+}
+
+VirtualRow.propTypes = {
+  index: PropTypes.number.isRequired,
+  style: PropTypes.object.isRequired,
+  data: PropTypes.shape({
+    items: PropTypes.array.isRequired,
+    expandedRows: PropTypes.instanceOf(Set).isRequired,
+    toggleExpanded: PropTypes.func.isRequired,
+  }).isRequired,
 };
 
+/**
+ * A high-performance table for displaying very large datasets of defects.
+ * It uses virtualization to only render visible rows and infinite scrolling
+ * to load data on demand.
+ */
 function VirtualizedDefectTable({ 
   defects, 
   loading = false, 
@@ -138,18 +129,19 @@ function VirtualizedDefectTable({
   isFetchingNextPage 
 }) {
   const [expandedRows, setExpandedRows] = useState(new Set());
+  const listRef = React.useRef(null);
 
-  const toggleExpanded = (defectId) => {
+  const toggleExpanded = useCallback((defectId) => {
     setExpandedRows(prev => {
       const newSet = new Set(prev);
-      if (newSet.has(defectId)) {
-        newSet.delete(defectId);
-      } else {
-        newSet.add(defectId);
-      }
+      if (newSet.has(defectId)) newSet.delete(defectId);
+      else newSet.add(defectId);
       return newSet;
     });
-  };
+    if (listRef.current) {
+        listRef.current.resetAfterIndex(0);
+    }
+  }, []);
 
   // Infinite scrolling implementation - automatically loads more data when user scrolls near bottom.
   // This combines with virtual scrolling for seamless experience with massive datasets.
@@ -170,10 +162,10 @@ function VirtualizedDefectTable({
   // React Window uses this to maintain smooth scrolling performance.
   const getItemSize = (index) => {
     const defect = defects[index];
-    if (!defect) return 60;
-    
-    const isExpanded = expandedRows.has(defect.id);
-    return isExpanded ? 200 : 60; // Base height + expanded content
+    if (!defect || !expandedRows.has(defect.id)) {
+      return VIRTUALIZED_TABLE_CONFIG.ROW_HEIGHT;
+    }
+    return VIRTUALIZED_TABLE_CONFIG.ROW_HEIGHT + 140;
   };
 
   // Memoized data object to prevent unnecessary re-renders in virtual list.
@@ -181,7 +173,7 @@ function VirtualizedDefectTable({
     items: defects,
     expandedRows,
     toggleExpanded
-  }), [defects, expandedRows]);
+  }), [defects, expandedRows, toggleExpanded]);
 
   if (loading && defects.length === 0) {
     return (
@@ -198,12 +190,12 @@ function VirtualizedDefectTable({
       <TableContainer>
         <Table>
           <TableHead>
-            <TableRow>
-              <TableCell width={60} />
-              <TableCell width={150}>Aircraft</TableCell>
-              <TableCell width={200}>Defect Type</TableCell>
-              <TableCell width={100}>Severity</TableCell>
-              <TableCell width={120}>Reported Date</TableCell>
+            <TableRow sx={{ display: 'flex' }}>
+              <TableCell sx={{ width: 40 }} />
+              <TableCell sx={{ flex: '1 1 20%', display: 'flex', alignItems: 'center' }}>{TABLE_HEADERS[0]}</TableCell>
+              <TableCell sx={{ flex: '1 1 30%' }}>{TABLE_HEADERS[1]}</TableCell>
+              <TableCell sx={{ flex: '1 1 15%' }}>{TABLE_HEADERS[2]}</TableCell>
+              <TableCell sx={{ flex: '1 1 20%' }}>{TABLE_HEADERS[3]}</TableCell>
             </TableRow>
           </TableHead>
         </Table>
@@ -213,6 +205,7 @@ function VirtualizedDefectTable({
       <Box sx={{ height: height }}>
         {defects.length > 0 ? (
           <List
+            ref={listRef}
             height={height}
             itemCount={defects.length}
             itemSize={getItemSize}
@@ -252,5 +245,14 @@ function VirtualizedDefectTable({
     </Paper>
   );
 }
+
+VirtualizedDefectTable.propTypes = {
+  defects: PropTypes.array.isRequired,
+  loading: PropTypes.bool,
+  height: PropTypes.number,
+  hasNextPage: PropTypes.bool,
+  fetchNextPage: PropTypes.func.isRequired,
+  isFetchingNextPage: PropTypes.bool,
+};
 
 export default VirtualizedDefectTable; 

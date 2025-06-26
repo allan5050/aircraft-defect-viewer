@@ -147,20 +147,33 @@ Speech-to-text was used to interact with the LLM more efficiently, allowing me t
     npm install
     ```
 5.  **Seed the Database:**
-    -   Run the seeding script to populate your Supabase table with the sample data. This script will delete any existing data before inserting the new records.
+    -   Run the seeding script to populate your Supabase table.
     ```bash
-    node seed_supabase.mjs
+    node backend/seed_supabase.mjs data/SMALL_air_defects.json
     ```
+    > **Note:** You can specify which data file to use (e.g., `large_aircraft_defects.json`).
+
 6.  **Run the Analytics Server:**
-    ```bash
-    uvicorn main:app --reload --port 8000
-    ```
+    -   **Option 1: From Project Root (Recommended):**
+        -   Make sure you are in the project's root directory (the one containing `frontend` and `backend`).
+        -   Run the server using:
+        ```bash
+        uvicorn backend.main:app --reload --port 8000
+        ```
+    
+    -   **Option 2: From Backend Directory:**
+        -   If you are inside the `backend` directory, use:
+        ```bash
+        uvicorn main:app --reload --port 8000
+        ```
+        > **Note:** The app is designed to work from both locations. If you get a "ModuleNotFoundError: No module named 'backend'" error, make sure you're using the correct command for your current directory.
+    
     The backend analytics service will be running at `http://localhost:8000`.
 
 You should now have the full application running!
 
 ## 📂 Data Model & Sample Dataset
-The core entity in Aviadex is a single **defect report**. Defects are stored in (and exposed from) the `defects` table in Supabase using the following schema:
+The core entity in the defect viewer tool is a single **defect report**. Defects are stored in (and exposed from) the `defects` table in Supabase using the following schema:
 
 ```sql
 CREATE TABLE defects (

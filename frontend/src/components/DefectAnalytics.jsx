@@ -2,6 +2,7 @@
 // This component provides the high-level analytics dashboard that gives users
 // a quick overview of key metrics before diving into the detailed table data.
 import React from 'react';
+import PropTypes from 'prop-types';
 import {
   Grid,
   Card,
@@ -13,7 +14,9 @@ import {
   Avatar,
   Button,
   IconButton,
-  Tooltip
+  Tooltip,
+  Skeleton,
+  CircularProgress
 } from '@mui/material';
 import {
   Warning,
@@ -22,59 +25,70 @@ import {
   Assessment,
   Refresh
 } from '@mui/icons-material';
+import StatCard from './StatCard';
 
-function StatCard({ title, value, subtitle, icon, color = 'primary' }) {
-  return (
-    <Card>
-      <CardContent>
-        <Box display="flex" justifyContent="space-between" alignItems="flex-start">
-          <Box>
-            <Typography color="textSecondary" gutterBottom variant="body2">
-              {title}
-            </Typography>
-            <Typography variant="h4" component="div">
-              {value}
-            </Typography>
-            {subtitle && (
-              <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-                {subtitle}
-              </Typography>
-            )}
-          </Box>
-          <Avatar sx={{ bgcolor: `${color}.light`, color: `${color}.main` }}>
-            {icon}
-          </Avatar>
+/**
+ * A skeleton loader for the StatCard component.
+ */
+const StatCardSkeleton = () => (
+  <Card>
+    <CardContent>
+      <Box display="flex" justifyContent="space-between" alignItems="flex-start">
+        <Box>
+          <Skeleton variant="text" width={100} />
+          <Skeleton variant="text" width={50} height={40} />
+          <Skeleton variant="text" width={120} />
         </Box>
-      </CardContent>
-    </Card>
-  );
-}
+        <Skeleton variant="circular" width={56} height={56} />
+      </Box>
+    </CardContent>
+  </Card>
+);
 
 // Main analytics dashboard component.
 // Displays key metrics that help users identify critical issues quickly,
 // supporting the business requirement for "structured data exchange" insights.
-function DefectAnalytics({ analytics, onRefresh }) {
-  // Debug logging to help troubleshoot
-  React.useEffect(() => {
-    console.log('DefectAnalytics received analytics:', analytics);
-    if (analytics?.severity_distribution) {
-      console.log('Severity distribution:', analytics.severity_distribution);
-      console.log('Top aircraft:', analytics.top_aircraft?.slice(0, 3));
-    }
-  }, [analytics]);
+function DefectAnalytics({ analytics, isLoading, onRefresh }) {
+  console.log("DefectAnalytics received props:", {
+    analytics,
+    isLoading,
+    hasRefresh: !!onRefresh
+  });
 
-  if (!analytics) {
+  // Handle both formats: { summary: {...} } from Supabase RPC and direct {...} from fallback API
+  const summary = analytics?.summary || analytics;
+  const severityTotal = summary ? Object.values(summary.severity_distribution || {}).reduce((a, b) => a + b, 0) : 0;
+
+  if (isLoading) {
     return (
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h5" gutterBottom>
-          Analytics Dashboard
-        </Typography>
-        <Typography color="textSecondary">Loading analytics...</Typography>
+      <Box sx={{ mb: 3 }}>
+        <Card>
+          <CardContent>
+            <Box display="flex" justifyContent="center" alignItems="center" minHeight={200}>
+              <CircularProgress />
+            </Box>
+          </CardContent>
+        </Card>
       </Box>
     );
   }
 
-  const severityTotal = Object.values(analytics.severity_distribution || {}).reduce((a, b) => a + b, 0);
+  if (!summary) {
+    console.warn("DefectAnalytics: Missing or invalid analytics summary data:", analytics);
+    return (
+      <Box sx={{ mb: 3 }}>
+        <Card>
+          <CardContent>
+            <Typography color="error">
+              Analytics data is not available.
+            </Typography>
+          </CardContent>
+        </Card>
+      </Box>
+    );
+  }
+
+  console.log("DefectAnalytics rendering with summary:", summary);
 
   return (
     <Box sx={{ mb: 4 }}>
@@ -85,7 +99,7 @@ function DefectAnalytics({ analytics, onRefresh }) {
         {/* Manual refresh capability gives users control over data freshness */}
         {onRefresh && (
           <Tooltip title="Refresh Analytics Data">
-            <IconButton onClick={onRefresh} color="primary">
+            <IconButton onClick={onRefresh} color="primary" disabled={isLoading}>
               <Refresh />
             </IconButton>
           </Tooltip>
@@ -98,7 +112,7 @@ function DefectAnalytics({ analytics, onRefresh }) {
         <Grid item xs={12} sm={6} md={3}>
           <StatCard
             title="Total Defects"
-            value={analytics.total_defects || 0}
+            value={summary.total_defects ?? 0}
             subtitle="All time"
             icon={<Assessment />}
             color="primary"
@@ -109,8 +123,8 @@ function DefectAnalytics({ analytics, onRefresh }) {
         <Grid item xs={12} sm={6} md={3}>
           <StatCard
             title="High Severity"
-            value={analytics.high_severity_count || 0}
-            subtitle={analytics.total_defects ? `${((analytics.high_severity_count / analytics.total_defects) * 100).toFixed(1)}% of total` : '0% of total'}
+            value={summary.high_severity_count ?? 0}
+            subtitle={summary.total_defects ? `${((summary.high_severity_count / summary.total_defects) * 100).toFixed(1)}% of total` : '0% of total'}
             icon={<Warning />}
             color="error"
           />
@@ -120,7 +134,7 @@ function DefectAnalytics({ analytics, onRefresh }) {
         <Grid item xs={12} sm={6} md={3}>
           <StatCard
             title="Recent Defects"
-            value={analytics.recent_defects_7d || 0}
+            value={summary.recent_defects_7d ?? 0}
             subtitle="Last 7 days"
             icon={<TrendingUp />}
             color="warning"
@@ -131,7 +145,7 @@ function DefectAnalytics({ analytics, onRefresh }) {
         <Grid item xs={12} sm={6} md={3}>
           <StatCard
             title="Aircraft Affected"
-            value={analytics.total_unique_aircraft || 0}
+            value={summary.total_unique_aircraft ?? 0}
             subtitle="Unique aircraft with defects"
             icon={<Flight />}
             color="success"
@@ -146,7 +160,7 @@ function DefectAnalytics({ analytics, onRefresh }) {
                 Severity Distribution
               </Typography>
               {severityTotal > 0 ? (
-                Object.entries(analytics.severity_distribution || {}).map(([severity, count]) => (
+                Object.entries(summary.severity_distribution || {}).map(([severity, count]) => (
                   <Box key={severity} sx={{ mb: 2 }}>
                     <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
                       <Typography variant="body2">{severity}</Typography>
@@ -175,18 +189,18 @@ function DefectAnalytics({ analytics, onRefresh }) {
                 Top Aircraft by Defects
               </Typography>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                {analytics.top_aircraft && analytics.top_aircraft.length > 0 ? (
-                  analytics.top_aircraft.slice(0, 5).map((aircraft, index) => (
-                    <Box key={aircraft.aircraft} display="flex" justifyContent="space-between" alignItems="center">
+                {summary.top_aircraft && summary.top_aircraft.length > 0 ? (
+                  summary.top_aircraft.slice(0, 5).map((aircraft, index) => (
+                    <Box key={aircraft.aircraft || aircraft.aircraft_registration} display="flex" justifyContent="space-between" alignItems="center">
                       <Box display="flex" alignItems="center" gap={1}>
                         <Typography variant="body2" color="textSecondary">
                           #{index + 1}
                         </Typography>
                         <Typography variant="body2">
-                          {aircraft.aircraft}
+                          {aircraft.aircraft || aircraft.aircraft_registration}
                         </Typography>
                       </Box>
-                      <Chip label={`${aircraft.count} defects`} size="small" />
+                      <Chip label={`${aircraft.count || aircraft.defect_count} defects`} size="small" />
                     </Box>
                   ))
                 ) : (
@@ -200,5 +214,41 @@ function DefectAnalytics({ analytics, onRefresh }) {
     </Box>
   );
 }
+
+DefectAnalytics.propTypes = {
+  /**
+   * The analytics data object fetched from the API.
+   */
+  analytics: PropTypes.shape({
+    summary: PropTypes.shape({
+      total_defects: PropTypes.number,
+      high_severity_count: PropTypes.number,
+      recent_defects_7d: PropTypes.number,
+      total_unique_aircraft: PropTypes.number,
+      severity_distribution: PropTypes.objectOf(PropTypes.number),
+      top_aircraft: PropTypes.arrayOf(PropTypes.shape({
+        aircraft: PropTypes.string,
+        count: PropTypes.number,
+      })),
+    }),
+    total_defects: PropTypes.number,
+    high_severity_count: PropTypes.number,
+    recent_defects_7d: PropTypes.number,
+    total_unique_aircraft: PropTypes.number,
+    severity_distribution: PropTypes.objectOf(PropTypes.number),
+    top_aircraft: PropTypes.arrayOf(PropTypes.shape({
+      aircraft: PropTypes.string,
+      count: PropTypes.number,
+    })),
+  }),
+  /**
+   * Boolean to indicate if the analytics data is currently loading.
+   */
+  isLoading: PropTypes.bool.isRequired,
+  /**
+   * Callback function to trigger a manual refresh of the analytics data.
+   */
+  onRefresh: PropTypes.func.isRequired,
+};
 
 export default DefectAnalytics;

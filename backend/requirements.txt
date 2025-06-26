@@ -5,4 +5,5 @@ pydantic==2.5.0
 python-multipart==0.0.6
 slowapi==0.1.9
 redis==5.0.1
+pydantic-settings
 # Note: SQLite is included with Python, no need to install

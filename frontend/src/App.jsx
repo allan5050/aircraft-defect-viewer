@@ -18,7 +18,8 @@ import VirtualizedDefectTable from './components/VirtualizedDefectTable';
 import DefectFilters from './components/DefectFilters';
 import DefectAnalytics from './components/DefectAnalytics';
 import DefectInsights from './components/DefectInsights';
-import { useDefectsPaginated, useDefects, useAnalytics } from './hooks/useDefects';
+import { useDefectsPaginated, useDefects } from './hooks/useDefects';
+import { useAnalytics } from './hooks/useAnalytics';
 
 const theme = createTheme({
   palette: {
@@ -120,9 +121,10 @@ function App() {
         </Box>
 
         {/* Analytics Dashboard */}
-        {analytics && !analyticsLoading && (
-          <DefectAnalytics 
-            analytics={analytics} 
+        {analytics && (
+          <DefectAnalytics
+            analytics={analytics}
+            isLoading={analyticsLoading}
             onRefresh={refreshAnalytics}
           />
         )}
